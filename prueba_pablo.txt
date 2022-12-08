@@ -1,5 +1,0 @@
-- Sustituir 0s por NA 
-- Descriptivos univariantes: summary + porcentaje de outliers + violinplot
-- Descriptivos bivariantes: scatterplot matrix y correlation plot
-- Gráficos multidimensionales: Andrew's plot y PCP
-- Imputar
