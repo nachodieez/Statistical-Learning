@@ -40,23 +40,23 @@ outliers <- findOutliers(data, names(data)[names(data) != "Outcome"])
 data<-data[!is.na(data$Insulin),]
 require(mice)
 dataIm <- mice(data, m = 1, method = "pmm")
-data2<-complete(dataIm)
+data2 <- complete(dataIm)
 
 ## Univariate descriptive analysis
 
 require(tidyverse)
 devtools::source_gist("2a1bb0133ff568cbe28d", filename = "geom_flat_violin.R")
 
-univariate_description<-function(x){
+univariate_description <- function(x){
   #summary
   {
     s <- summary(x)
     sd_x <- c(St.dev = sd(x))
     s2 <- append(s, sd_x)
     df <-data.frame(round(as.numeric(s2),2)) %>% t() %>% as.data.frame()
-    colnames(df)<-names(s2)
-    rownames(df)<-NULL
-    df2<-df
+    colnames(df) <- names(s2)
+    rownames(df) <- NULL
+    df2 <- df
   }
   #plot
   {
@@ -64,10 +64,6 @@ univariate_description<-function(x){
     plot<-p0 <- ggplot(data = data.frame(y=x), aes(x = "", y = y)) +
       geom_flat_violin(position = position_nudge(x = .3, y = 0), alpha = .8,
                        fill = "pink1") +
-      guides(fill = "none") +
-      guides(color = "none") +
-      scale_color_brewer(palette = "Dark2") +
-      scale_fill_brewer(palette = "Dark2") +
       theme_classic() + 
       geom_point(position = pos, size = 1.5, alpha = 0.8, col = "pink") +
       geom_boxplot(width = .1, show.legend = FALSE, outlier.shape = NA, 
@@ -86,7 +82,7 @@ a$summary
 
 require(car)
 
-colnames(data2)[1:8]<-c("Pregnancies", "Glucose",
+colnames(data2)[1:8] <- c("Pregnancies", "Glucose",
                          "\nBlood\nPressure", "Skin\nThickness", 
                          "Insulin", "BMI", 
                          "\nDiabetes\nPedigree\nFunction",
@@ -102,8 +98,8 @@ scatterPlotMatrix(data2[,-9], corrPlotType = "Text")
 
 require(corrplot)
 
-correlation<-cor(data2[,-9])
-colnames(correlation)<-c("Pregnancies", "Glucose",
+correlation <- cor(data2[,-9])
+colnames(correlation) <- c("Pregnancies", "Glucose",
                          "Blood\nPressure", "Skin\nThickness", 
                          "Insulin", "BMI", 
                          "Diabetes\nPedigree\nFunction",
@@ -119,21 +115,20 @@ corrplot.mixed(correlation, lower = "number", upper = "color",
 require(pracma)
 
 andrewsplot(as.matrix(data2[,-9]), as.factor(data2[,9]),
-            style="cart")
+            style = "cart")
 
 # PCP
 
 require(MASS)
 
-col1<-"pink"
-col2<-"darkblue"
-vec_col<-data2$Outcome
-vec_col[vec_col==0]<-col1
-vec_col[vec_col==1]<-col2
+col1 <- "pink"
+col2 <- "darkblue"
+vec_col <- data2$Outcome
+vec_col[vec_col==0] <- col1
+vec_col[vec_col==1] <- col2
 
 par(las=2)
 parcoord(data2[,-9], col = vec_col, var.label = T)
 
 legend("topright", legend = c("No diabetes", "Diabetes"),
-                              col = c("pink", "darkblue"),
-       lty = 1, lwd = 2)
+       col = c("pink", "darkblue"), lty = 1, lwd = 2)
