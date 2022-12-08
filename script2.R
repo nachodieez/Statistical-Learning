@@ -1,4 +1,5 @@
 ## Read data and set NAs
+
 data <- read.csv("diabetes.csv")
 data$Outcome <- factor(data$Outcome, c(0,1))
 
@@ -17,6 +18,7 @@ data        <- dataNA$data
 percentages <- dataNA$percentage
 
 ## Outliers
+
 findOutliers <- function(data, fields){
   outliers <- list()
   for (field in fields){
@@ -28,8 +30,110 @@ findOutliers <- function(data, fields){
   }
   return (outliers)
 }
+
 outliers <- findOutliers(data, names(data)[names(data) != "Outcome"])
 
 ## Fill NAs (Predictive Mean Matching)
-library(mice)
-dataIn <- mice(data, m = 5, method = "pmm")
+
+# Drop individuals with missing insulin (48%)
+
+data<-data[!is.na(data$Insulin),]
+require(mice)
+dataIm <- mice(data, m = 1, method = "pmm")
+data2<-complete(dataIm)
+
+## Univariate descriptive analysis
+
+require(tidyverse)
+devtools::source_gist("2a1bb0133ff568cbe28d", filename = "geom_flat_violin.R")
+
+univariate_description<-function(x){
+  #summary
+  {
+    s <- summary(x)
+    sd_x <- c(St.dev = sd(x))
+    s2 <- append(s, sd_x)
+    df <-data.frame(round(as.numeric(s2),2)) %>% t() %>% as.data.frame()
+    colnames(df)<-names(s2)
+    rownames(df)<-NULL
+    df2<-df
+  }
+  #plot
+  {
+    pos <- position_jitter(width = 0.15, seed = 1)
+    plot<-p0 <- ggplot(data = data.frame(y=x), aes(x = "", y = y)) +
+      geom_flat_violin(position = position_nudge(x = .3, y = 0), alpha = .8,
+                       fill = "pink1") +
+      guides(fill = "none") +
+      guides(color = "none") +
+      scale_color_brewer(palette = "Dark2") +
+      scale_fill_brewer(palette = "Dark2") +
+      theme_classic() + 
+      geom_point(position = pos, size = 1.5, alpha = 0.8, col = "pink") +
+      geom_boxplot(width = .1, show.legend = FALSE, outlier.shape = NA, 
+                   alpha = 0.5) + xlab("") + ylab(names(x))
+  }
+  return(list(summary = df2, plot = plot))
+}
+
+a<-univariate_description(data2$Glucose)
+a$plot
+a$summary
+
+## Bivariate descriptive analysis
+
+# Scatterplot Matrix
+
+require(car)
+
+colnames(data2)[1:8]<-c("Pregnancies", "Glucose",
+                         "\nBlood\nPressure", "Skin\nThickness", 
+                         "Insulin", "BMI", 
+                         "\nDiabetes\nPedigree\nFunction",
+                         "Age")
+scatterplotMatrix(data2[,-9], regLine = F, diagonal = F, 
+                  smooth = F, col = "peachpuff2", cex.labels = 1.25)
+
+require(scatterPlotMatrix)
+
+scatterPlotMatrix(data2[,-9], corrPlotType = "Text")
+
+# Correlation plot
+
+require(corrplot)
+
+correlation<-cor(data2[,-9])
+colnames(correlation)<-c("Pregnancies", "Glucose",
+                         "Blood\nPressure", "Skin\nThickness", 
+                         "Insulin", "BMI", 
+                         "Diabetes\nPedigree\nFunction",
+                         "Age")
+
+corrplot.mixed(correlation, lower = "number", upper = "color",
+         order = "AOE", diag = "n", tl.col = "black", tl.cex = 0.75)
+
+## Multidimensional plots
+
+# Andrew's plot
+
+require(pracma)
+
+andrewsplot(as.matrix(data2[,-9]), as.factor(data2[,9]),
+            style="cart")
+
+# PCP
+
+require(MASS)
+
+col1<-"pink"
+col2<-"darkblue"
+vec_col<-data2$Outcome
+vec_col[vec_col==0]<-col1
+vec_col[vec_col==1]<-col2
+
+par(las=2)
+parcoord(data2[,-9], col = vec_col, var.label = T)
+
+legend("topright", legend = c("No diabetes", "Diabetes"),
+                              col = c("pink", "darkblue"),
+       lty = 1, lwd = 2)
