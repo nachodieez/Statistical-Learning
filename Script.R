@@ -111,7 +111,6 @@ colnames(correlation) <- c("Pregnancies", "Glucose",
 
 corrplot.mixed(correlation, lower = "number", upper = "color",
          order = "AOE", diag = "n", tl.col = "black", tl.cex = 0.75) 
-# no se ve con esos colores, puede que sea buena idea cambiarlos
 
 ## Multidimensional plots
 
@@ -119,16 +118,17 @@ corrplot.mixed(correlation, lower = "number", upper = "color",
 
 require(pracma)
 
-andrewsplot(as.matrix(data2[,-9]), as.factor(data2[,9]),
+andrewsplot(as.matrix(data2[,-9]), data2[,9],
             style = "cart")
 
 # PCP
 
 require(MASS)
 
-col1 <- "pink"
-col2 <- "darkblue"
-vec_col <- data2$Outcome
+colors <- c("pink2", "darkblue")
+col1 <- colors[1]
+col2 <- colors[2]
+vec_col <- as.character(data2$Outcome)
 vec_col[vec_col==0] <- col1 # esta línea y la siguiente no van
 vec_col[vec_col==1] <- col2
 
@@ -136,5 +136,4 @@ par(las=2)
 parcoord(data2[,-9], col = vec_col, var.label = T)
 
 legend("topright", legend = c("No diabetes", "Diabetes"),
-       col = c("pink", "darkblue"), lty = 1, lwd = 2)
-
+       col = colors, lty = 1, lwd = 2)
