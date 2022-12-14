@@ -1,0 +1,247 @@
+---
+title: "Entrega1"
+author: 
+  - José Ignacio Díez Ruiz -- 100487766
+  - Carlos Roldán Piñero -- 100484904
+  - Pablo Vidal Fernández -- 100483912
+date: "`r Sys.Date()`"
+header-includes:
+  - \renewcommand{\and}{\\}
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F,
+                      fig.dim = c(8,4))
+```
+
+## Step 1
+
+Perform a graphical analysis of the data set and try to obtain interesting conclusions from the analysis. Take into account the qualitative variable of interest to see which variables are the most informative to distinguish the groups formed by such variable. 
+
+```{r}
+require(tidyverse)
+require(GGally)
+data <- read.csv("diabetes.csv")
+
+data.clean <- data
+for (name in names(data)){
+  if (name == "Pregnancies"){
+    next
+  }
+  if (name == "Outcome"){
+    next
+  }
+  data.clean <- filter(data.clean, data.clean[name] != 0)
+}
+
+data0 <- data.clean[data.clean$Outcome == 0,]
+data1 <- data.clean[data.clean$Outcome == 1,]
+data.clean$Outcome <- factor(data.clean$Outcome, c(0,1), c("Negative", "Positive"))
+
+histogram_by_groups<-function(data0, data1, var, label = NULL){
+  if(is.null(label)){
+    label <- var
+  }
+  ggplot(data0, aes(x = eval(parse(text = var)))) + geom_histogram(aes(
+    y = after_stat(count / sum(count)), fill = "No diabetes"), bins = 10, 
+    colour = "white", alpha = 0.8, boundary = 0) + 
+    geom_histogram(data = data1, aes(x = eval(parse(text = var)), y = after_stat(
+      count / sum(count)), fill = "Diabetes"), bins = 10, colour = "white",
+      alpha = 0.6, boundary = 0, inherit.aes = F) + 
+        theme_bw() + scale_fill_manual(name = "", breaks = 
+                                         c("Diabetes (1)", "No diabetes (0)"),
+                                       values = 
+                                         c("Diabetes (1)" = "pink",
+                                           "No diabetes (0)" = "lightskyblue")) +
+        xlab(label) + ylab("Relative frequency")
+}
+```
+
+Let's inspect the relative histogram of the numerical variables, splitting by the categorical variable:
+
+```{r}
+histogram_by_groups(data0, data1, "Pregnancies")
+```
+We can see that people who have diabetes have had more pregnancies than those who don't have diabetes.
+
+```{r}
+histogram_by_groups(data0, data1, "Glucose")
+```
+
+We can see that people who have diabetes have higher levels of glucose.
+
+```{r}
+histogram_by_groups(data0, data1, "BloodPressure", "Blood pressure")
+```
+
+It seems that blood pressure might be a bit higher for those who had diabetes.
+
+```{r}
+histogram_by_groups(data0, data1, "SkinThickness", "Skin thickness")
+```
+
+People who have diabetes then to have higher skin thickness.
+
+```{r}
+histogram_by_groups(data0, data1, "Insulin")
+```
+Toca arreglar lo de los 0s.
+
+```{r}
+histogram_by_groups(data0, data1, "BMI")
+```
+
+People with diabetes tend to have higher BMI.
+
+```{r}
+histogram_by_groups(data0, data1, "DiabetesPedigreeFunction",
+                    "Diabetes\nPedigree\nFunction")
+```
+It seems that people with diabetes might have higher diabetes pedigree function.
+
+```{r}
+histogram_by_groups(data0, data1, "Age")
+```
+It seems that there are more young people who do not have diabetes.
+
+Now, let's take a look at some multivariate plots. We'll begin by inspecting the Parallel Coordinate Plot:
+
+```{r}
+require(MASS)
+
+colors <- c("pink2", "darkblue")
+col1 <- colors[1]
+col2 <- colors[2]
+vec_col <- as.character(data.clean$Outcome)
+vec_col[vec_col=="Negative"] <- col1 # esta línea y la siguiente no van
+vec_col[vec_col=="Positive"] <- col2
+
+par(las=2)
+parcoord(data.clean[,-9], col = vec_col)
+
+legend("topright", legend = c("No diabetes", "Diabetes"),
+       col = colors, lty = 1, lwd = 2)
+```
+
+It seems that, overall, the blue lines are over the pink lines. This is most notable on the Glucose and BMI variables.
+
+The Andrew's plot is the following: 
+
+```{r}
+require(pracma)
+
+andrewsplot(as.matrix(data.clean[,-9]), data.clean[,9],
+            style = "cart")
+legend("topright", legend = c("No diabetes", "Diabetes"),
+       col = c("black", "red"), lty = 1, lwd = 2)
+```
+
+Again, we see that the two groups are different. The group of people who have diabetes tend to have more volatile curves.
+
+## Step 2 
+
+Estimate the main characteristics of the quantitative variables (mean vector, covariance matrix, correlation matrix) with all the observations in the data set as well as in each of the groups with the most appropriate method. Give conclusions from the analysis.
+
+As we have n>>p, we can estimate those characteristics with the sample mean, sample covariance and sample correlation matrix. 
+
+For the overall data, we have:
+
+```{r}
+numerical_data <- data[,-9]
+sapply(numerical_data, mean)
+cov(numerical_data)
+
+require(corrplot)
+
+correlation <- cor(numerical_data)
+colnames(correlation) <- c("Pregnancies", "Glucose",
+                         "Blood\nPressure", "Skin\nThickness", 
+                         "Insulin", "BMI", 
+                         "Diabetes\nPedigree\nFunction",
+                         "Age")
+
+corrplot.mixed(correlation, lower = "number", upper = "color",
+         diag = "n", tl.col = "black", tl.cex = 0.65,
+         lower.col = "black") 
+```
+There are some variables that seem to be correlated. The positive correlation between age and pregnancies isn't surprising, but there seems to be a positive correlationship between insulin levels and skin thickness. Skin thickness and BMI also seem to have a positive relationship. 
+
+Let's take a look into the group of people who have diabetes:
+
+```{r}
+numerical_data<-data1[,-9]
+sapply(numerical_data, mean)
+cov(numerical_data)
+
+correlation <- cor(numerical_data)
+colnames(correlation) <- c("Pregnancies", "Glucose",
+                         "Blood\nPressure", "Skin\nThickness", 
+                         "Insulin", "BMI", 
+                         "Diabetes\nPedigree\nFunction",
+                         "Age")
+
+corrplot.mixed(correlation, lower = "number", upper = "color",
+         diag = "n", tl.col = "black", tl.cex = 0.65,
+         lower.col = "black") 
+```
+Now, let's take a look into the group of people who don't have diabetes and compare the results:
+
+```{r}
+numerical_data<-data0[,-9]
+sapply(numerical_data, mean)
+cov(numerical_data)
+
+correlation <- cor(numerical_data)
+colnames(correlation) <- c("Pregnancies", "Glucose",
+                         "Blood\nPressure", "Skin\nThickness", 
+                         "Insulin", "BMI", 
+                         "Diabetes\nPedigree\nFunction",
+                         "Age")
+
+corrplot.mixed(correlation, lower = "number", upper = "color",
+         diag = "n", tl.col = "black", tl.cex = 0.65,
+         lower.col = "black") 
+```
+
+The major changes are that the correlation between skin thickness and diabetes pedigree function is lower in the group who don't have diabetes, and the correlation between BMI and age is positive (in the group of people who have diabetes, it was negative).
+
+Taking a look at the means of the variables, we can see what the histograms already reflected: people with diabetes tend to have had more pregnancies, and glucose and insulin levels are higher.
+
+A good summary is presented in the following plot, that gives the scatterplots and the correlations:
+
+```{r}
+ggpairs(data.clean, aes(color = Outcome), legend = 1, columns = c(1:(length(data.clean)-1)),
+        diag = list(continuous = "barDiag")  ) +
+  theme(legend.position = "bottom") + scale_fill_manual(values = c("pink", "deeppink4")) + scale_color_manual(values = c("pink", "deeppink4")) + labs(fill = "Outcome")
+```
+
+(¿Qué comentar de la matriz de covarianzas?)
+
+## Step 3
+
+Try to find outliers as well as any other characteristic of interest.
+
+We will begin by taking a look at the univariate level:
+
+```{r}
+findOutliers <- function(data, fields){
+  outliers <- list()
+  for (field in fields){
+    qs  <- quantile(data[[field]], c(0.25, 0.75), na.rm = TRUE)
+    iqr <- qs[2] - qs[1]
+    lq  <- qs[1] - 1.5*iqr
+    hq  <- qs[2] + 1.5*iqr
+    outliers[[field]] <- which((data[[field]] < lq) & (data[[field]] > hq))
+  }
+  return (outliers)
+}
+
+outliers <- findOutliers(data.clean, names(data)[names(data) != "Outcome"])
+outliers
+```
+
+Using the method that the boxplots use to detect outliers, there are not any outliers in the data.
+
+
+
