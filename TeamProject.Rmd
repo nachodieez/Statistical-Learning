@@ -4,7 +4,7 @@ output: pdf_document
 author: 
   - José Ignacio Díez Ruiz	100487766
   - Carlos Roldán Piñero	100484904
-  - Pablo Vidal Fernández	100483912
+  - Pablo Vidal Fernández	100483812
 date: "`r Sys.Date()`"
 header-includes:
   - \renewcommand{\and}{\\}
@@ -109,7 +109,6 @@ require(mice)
 dataIm <- mice(data, m = 1, method = "pmm")
 data2 <- complete(dataIm)
 ```
-
 
 
 

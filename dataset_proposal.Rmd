@@ -3,7 +3,7 @@ title: "Datasets for Final Project"
 author: 
   - José Ignacio Díez Ruiz -- 100487766
   - Carlos Roldán Piñero -- 100484904
-  - Pablo Vidal Fernández -- 100483912
+  - Pablo Vidal Fernández -- 100483812
 
 date: '2022-11-14'
 output: pdf_document
