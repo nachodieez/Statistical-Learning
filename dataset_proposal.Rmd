@@ -30,7 +30,7 @@ a plot of the distribution for each of the quantitative variables among them.
 
 This dataset contains information regarding diagnostic measurements of females over 21 years old of Pima Indian Heritage. It is comprised of 768 individuals and 9 variables. The dataset can be found in <https://www.kaggle.com/datasets/uciml/pima-indians-diabetes-database>. 
 
-On the particulatities of the dataset it is worth to comment that although there are not explicit NA values, they are present as 0 values in characteristics or tests that do not make sense to have a 0 result.
+On the particularities of the dataset it is worth to comment that although there are not explicit NA values, they are present as 0 values in characteristics or tests that do not make sense to have a 0 result.
 In order to properly define the present variables, we did clean those fake measurements.
 
 Before we start adressing the individual variables, we do a quick grid plot to see if any of our variables is strongly correlated with another so that we may reduce the number of them.
