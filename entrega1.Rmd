@@ -3,7 +3,7 @@ title: "Entrega1"
 author: 
   - José Ignacio Díez Ruiz -- 100487766
   - Carlos Roldán Piñero -- 100484904
-  - Pablo Vidal Fernández -- 100483912
+  - Pablo Vidal Fernández -- 100483812
 date: "`r Sys.Date()`"
 header-includes:
   - \renewcommand{\and}{\\}
@@ -19,41 +19,51 @@ knitr::opts_chunk$set(echo = TRUE, message = F, warning = F,
 
 Perform a graphical analysis of the data set and try to obtain interesting conclusions from the analysis. Take into account the qualitative variable of interest to see which variables are the most informative to distinguish the groups formed by such variable. 
 
+The first thing that we do in our dataset is change the 0's in the variables that are not Pregnancies or Outcome to NA's.
+
 ```{r}
 require(tidyverse)
 require(GGally)
+require(visdat)
+
 data <- read.csv("diabetes.csv")
 
-data.clean <- data
-for (name in names(data)){
-  if (name == "Pregnancies"){
-    next
-  }
-  if (name == "Outcome"){
-    next
-  }
-  data.clean <- filter(data.clean, data.clean[name] != 0)
-}
+data[data==0]<-NA
 
+data$Pregnancies[is.na(data$Pregnancies)] <- 0
+data$Outcome[is.na(data$Outcome)] <- 0
+vis_miss(data)
+```
+
+The variable Insulin has nearly a 50% of NA's. We cannot impute a variable with that many NA's, so our first thought would be to drop the variable. However, if we did that, we would be left with less than 8 numerical variables, disobeying the guidelines of the project. We opt to remove all the rows with NA in that variable, and, as a consequence, we are left with very few NA's.
+
+```{r}
+data.clean <- data %>% filter(!is.na(Insulin))
+sum(is.na(data.clean))
+```
+
+We opt to remove all the rows with NA in that variable, and, as a consequence, we are left with very few NA's.
+
+```{r}
 data0 <- data.clean[data.clean$Outcome == 0,]
 data1 <- data.clean[data.clean$Outcome == 1,]
 data.clean$Outcome <- factor(data.clean$Outcome, c(0,1), c("Negative", "Positive"))
 
-histogram_by_groups<-function(data0, data1, var, label = NULL){
+histogram_by_groups <- function(data0, data1, var, label = NULL){
   if(is.null(label)){
     label <- var
   }
   ggplot(data0, aes(x = eval(parse(text = var)))) + geom_histogram(aes(
-    y = after_stat(count / sum(count)), fill = "No diabetes"), bins = 10, 
+    y = after_stat(count / sum(count)), fill = "Negative"), bins = 10, 
     colour = "white", alpha = 0.8, boundary = 0) + 
     geom_histogram(data = data1, aes(x = eval(parse(text = var)), y = after_stat(
-      count / sum(count)), fill = "Diabetes"), bins = 10, colour = "white",
+      count / sum(count)), fill = "Positive"), bins = 10, colour = "white",
       alpha = 0.6, boundary = 0, inherit.aes = F) + 
         theme_bw() + scale_fill_manual(name = "", breaks = 
-                                         c("Diabetes (1)", "No diabetes (0)"),
+                                         c("Positive", "Negative"),
                                        values = 
-                                         c("Diabetes (1)" = "pink",
-                                           "No diabetes (0)" = "lightskyblue")) +
+                                         c("Positive" = "pink",
+                                           "Negative" = "lightskyblue")) +
         xlab(label) + ylab("Relative frequency")
 }
 ```
@@ -131,7 +141,7 @@ The Andrew's plot is the following:
 ```{r}
 require(pracma)
 
-andrewsplot(as.matrix(data.clean[,-9]), data.clean[,9],
+andrewsplot(as.matrix(na.omit(data.clean[,-9])), na.omit(data.clean)[,9],
             style = "cart")
 legend("topright", legend = c("No diabetes", "Diabetes"),
        col = c("black", "red"), lty = 1, lwd = 2)
@@ -148,13 +158,13 @@ As we have n>>p, we can estimate those characteristics with the sample mean, sam
 For the overall data, we have:
 
 ```{r}
-numerical_data <- data[,-9]
-sapply(numerical_data, mean)
-cov(numerical_data)
+numerical_data <- data.clean[,-9]
+sapply(numerical_data, mean, na.rm = T)
+cov(numerical_data, use = "complete.obs")
 
 require(corrplot)
 
-correlation <- cor(numerical_data)
+correlation <- cor(numerical_data, use = "complete.obs")
 colnames(correlation) <- c("Pregnancies", "Glucose",
                          "Blood\nPressure", "Skin\nThickness", 
                          "Insulin", "BMI", 
@@ -171,10 +181,10 @@ Let's take a look into the group of people who have diabetes:
 
 ```{r}
 numerical_data<-data1[,-9]
-sapply(numerical_data, mean)
-cov(numerical_data)
+sapply(numerical_data, mean, na.rm = T)
+cov(numerical_data, use = "complete.obs")
 
-correlation <- cor(numerical_data)
+correlation <- cor(numerical_data, use = "complete.obs")
 colnames(correlation) <- c("Pregnancies", "Glucose",
                          "Blood\nPressure", "Skin\nThickness", 
                          "Insulin", "BMI", 
@@ -189,10 +199,10 @@ Now, let's take a look into the group of people who don't have diabetes and comp
 
 ```{r}
 numerical_data<-data0[,-9]
-sapply(numerical_data, mean)
-cov(numerical_data)
+sapply(numerical_data, mean, na.rm = T)
+cov(numerical_data, use = "complete.obs")
 
-correlation <- cor(numerical_data)
+correlation <- cor(numerical_data, use = "complete.obs")
 colnames(correlation) <- c("Pregnancies", "Glucose",
                          "Blood\nPressure", "Skin\nThickness", 
                          "Insulin", "BMI", 
@@ -210,19 +220,18 @@ Taking a look at the means of the variables, we can see what the histograms alre
 
 A good summary is presented in the following plot, that gives the scatterplots and the correlations:
 
-```{r}
+```{r, fig.dim=c(16,16)}
 ggpairs(data.clean, aes(color = Outcome), legend = 1, columns = c(1:(length(data.clean)-1)),
         diag = list(continuous = "barDiag")  ) +
-  theme(legend.position = "bottom") + scale_fill_manual(values = c("pink", "deeppink4")) + scale_color_manual(values = c("pink", "deeppink4")) + labs(fill = "Outcome")
+  theme(legend.position = "bottom") + scale_fill_manual(values = c("pink", "deeppink4")) + 
+  scale_color_manual(values = c("pink", "deeppink4")) + labs(fill = "Outcome")
 ```
-
-(¿Qué comentar de la matriz de covarianzas?)
 
 ## Step 3
 
 Try to find outliers as well as any other characteristic of interest.
 
-We will begin by taking a look at the univariate level:
+Taking a look at the univariate level:
 
 ```{r}
 findOutliers <- function(data, fields){
@@ -238,10 +247,286 @@ findOutliers <- function(data, fields){
 }
 
 outliers <- findOutliers(data.clean, names(data)[names(data) != "Outcome"])
+
 outliers
 ```
 
 Using the method that the boxplots use to detect outliers, there are not any outliers in the data.
 
+## Step 4
+
+Impute missing data.
+
+```{r}
+sum(is.na(data.clean))
+```
+
+There are only two missing values. We will impute them using the **mice** package, by predictive mean matching. 
+
+```{r, results='hide'}
+require(mice)
+dataIm <- mice(data.clean, m = 1, method = "pmm")
+data <- complete(dataIm)
+```
+
+## Step 5
+
+Carry out dimension reduction (principal component analysis, independent component analysis and factor analysis). Once more, obtain conclusions from the analysis.
+
+We will begin with PCA, but first, we will take the logarithm of some of the variables to make them more symmetric:
+
+```{r}
+par(mfrow = c(1,2))
+hist(data$BMI, main = "BMI", freq = F, xlab = "", ylab = "")
+hist(log(data$BMI), main = "log(BMI)", freq = F, xlab = "", ylab = "")
+
+par(mfrow = c(1,2))
+hist(data$Insulin, main = "Insulin", freq = F, xlab = "", ylab = "")
+hist(log(data$Insulin), main = "log(Insulin)", freq = F, xlab = "", ylab = "")
+
+par(mfrow = c(1,2))
+hist(data$DiabetesPedigreeFunction, 
+     main = "Diabetes pedigree\n function", freq = F, xlab = "", ylab = "")
+hist(log(data$DiabetesPedigreeFunction), main = "log(Diabetes pedigree \n function)", freq = F, xlab = "", ylab = "")
+
+data$BMI <- log(data$BMI)
+data$Insulin <- log(data$Insulin)
+data$DiabetesPedigreeFunction <- log(data$DiabetesPedigreeFunction)
+
+colnames(data)[5:7] <- paste0("log_", colnames(data)[5:7])
+```
+
+We must scale the data before performing the PCA.
+
+```{r}
+data_pcs <- prcomp(data[,-9], scale = TRUE)
+
+colours <- c("pink", "deeppink4")
+vec_col <- ifelse(data$Outcome == "Negative", colours[1], 
+                  colours[2])
+
+df <- as.data.frame(data_pcs$x[,1:2])
+df$group <- data$Outcome
+colnames(df)<-c("x", "y", "group")
+
+ggplot(df, aes(x = x, y = y, col = group)) + geom_point() +
+  xlab("First PC") + ylab("Second PC") + ggtitle("First two PCs") + 
+  scale_colour_manual(values = c("pink", "deeppink4")) + theme_bw() + labs(col = "Group")
+```
+Using the first two principal components, we can see that the first PC separates reasonably well the two groups. 
+
+We can see the loadings of the variables in each PC. For example, for the first one: 
+
+```{r, fig.width = 7}
+p <- ncol(data[,-9])
+df2 <- data.frame(x = 1:p, y = data_pcs$rotation[,1])
+
+ggplot(df2, aes(x = x, y = y)) + geom_point() +
+  geom_label(label = colnames(data[,-9]), label.size = 0.3) + xlab("Variables") +
+  ylab("Loadings") + 
+  ggtitle("First PC") +
+  theme_bw() + xlim(0, 10) + 
+  ylim(-0.3, 0.6) + scale_x_continuous(breaks = c(0:10)) + 
+  geom_hline(yintercept = 0)
+```
+
+All the variables contribute positively to the first PC.
+
+The second PC:
+
+```{r}
+df3 <- data.frame(x = 1:p, y = data_pcs$rotation[,2])
+
+ggplot(df3, aes(x = x, y = y)) + geom_point() +
+  geom_label(label = colnames(data[,-9]), label.size = 0.3) + xlab("Variables") +
+  ylab("Loadings") + 
+  theme_bw() + xlim(c(-1, 10)) + 
+  ggtitle("Second PC") +
+  ylim(-1, 1) + scale_x_continuous(breaks = c((-1):10)) + 
+  geom_hline(yintercept = 0)
+```
+
+Pregnancies and Age have a negative loading, while log_BMI and skin thickness have a positive loading.  
+
+```{r}
+df4 <- data.frame(x = data_pcs$rotation[,1], y = data_pcs$rotation[,2])
+
+ggplot(df4, aes(x = x, y = y)) + geom_point() +
+  geom_label(label = colnames(data[,-9]), label.size = 0.3) + xlab("Variables") +
+  ylab("Loadings") + 
+  theme_bw() + xlim(0, 10) + 
+  ggtitle("1st and 2nd PCs") +
+  ylim(-0.3, 0.6) + scale_x_continuous(breaks = c(0:10)) + 
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 0)
+
+```
+We can see in this plot the information conveyed by the two last plots. 
+
+Graphing the biplot:
+
+```{r}
+biplot(data_pcs, col = vec_col, cex = c(0.5,0.8))
+```
+log_BMI, log_DiabetesPedigreeFunction and skin thickness seem to be uncorrelated with age and pregnancies. 
+
+Looking into the variance retained by the PCs:
+
+```{r}
+library(factoextra)
+fviz_eig(data_pcs, ncp = 17, addlabels = T, barfill = col1, barcolor = col2)
+```
+
+We can see that the first three dimensions retain nearly 2/3 of the total variance. Using the plot, we believe that 3 PCs should be retained. 
+
+Let's see the scatterplots:
+
+```{r}
+pairs(data_pcs$x[,1:3], col = vec_col)
+```
+
+corrplot(cor(X,X_pcs$x),is.corr=T)
+corrplot(cor(X,X_pcs$x[,1:4]),is.corr=T)
+
+```{r}
+corrplot(cor(data[,-9], data_pcs$x), is.corr = T)
+corrplot(cor(data[,-9], data_pcs$x[,1:4]), is.corr = T)
+```
+We can see again that the first PC is positively correlated with all the original variables. The second PC is positively correlated with skin thickness and log_BMI, and negatively correlated with age and pregnancies. The third PC is negatively correlated with log_insulin and glucose, and slightly correlated with blood pressure and skin thickness. The fourth PC is negatively correlated with log_DiabetesPedigreeFunction and the fifth PC with blood pressure. The remaining PCs are not correlated heavily with any variables. 
+
+Moving on to Independent Component Analysis:
+
+```{r}
+require(ica)
+data_trans_ica <- icafast(data[,-9], nc = p, alg = "par")
+Z <- data_trans_ica$S
+colnames(Z) <- sprintf("IC-%d", seq(1,8))
+n <- nrow(data)
+Z <- Z * sqrt((n-1)/n)
+
+par(mfrow = c(3,3))
+sapply(colnames(Z), function(cname){hist(as.data.frame(Z)[[cname]],
+                          main = cname, col = "deeppink4", xlab = "")})
+```
+As we can see, all the ICs are centered around 0.
+
+```{r}
+neg_entropy <- function(z){1/12 * mean(z^3)^2 + 1/48 * mean(z^4)^2}
+Z_neg_entropy <- apply(Z, 2, neg_entropy)
+ic_sort <- sort(Z_neg_entropy, decreasing = TRUE, index.return = TRUE)$ix
+ic_sort
+par(mfrow = c(1,1))
+plot(Z_neg_entropy[ic_sort], type = "b", col = col1, pch = 19,
+     ylab = "Neg-entropy", main = "Neg-entropies", lwd = 3)
+Z_ic_imp <- Z[, ic_sort]
+```
+
+There are two ICs with negative entropy clearly greater than the other six.
+
+```{r}
+df5 <- data.frame(x = Z_ic_imp[,1], y = Z_ic_imp[,2], group = data[,9])
+ggplot(df5, aes(x = x, y = y, col = group)) + geom_point() +
+  xlab("First IC") + ylab("Second IC") + ggtitle("ICs with more neg-entropy") + 
+  scale_colour_manual(values = c("pink", "deeppink4")) + theme_bw() + labs(col = "Group")
+
+```
+
+There are some points who may be outliers, and a clear outlier from the "Positive" group:
+
+```{r}
+which(df5$x < -2.5)
+which(df5$y < -3)
+```
+
+```{r}
+pairs(Z_ic_imp, col = vec_col)
+```
+
+It seems that IC1, IC2 and IC3 are able to differentiate the groups. IC1 was the IC with the lowest entropy, while IC3 is the second IC with more negative entropy.
+
+The correlation between the original values and Z:
+
+```{r}
+corrplot(cor(data[,-9], Z_ic_imp), is.corr = T)
+```
+
+Most ICs have at least one original variable that they are highly correlated with.
+
+The correlation between the PCs and the ICs is:
+
+```{r}
+colnames(data_pcs$x)<-paste0("PC", 1:8)
+corrplot(cor(data_pcs$x, Z_ic_imp), lower.col = "black")
+```
+We have the same with the PCs. All the ICs have correlations with more than one PC. 
+
+Now, we will perform factor analysis.
+
+```{r}
+require(psych)
+corrplot(cor(data[,-9]), order = "hclust")
+```
+
+There are groups of correlated variables that may suggest a factor structure.
+
+We will focus on the first three PCs.
+
+The initial estimates of M and Sigma_nu is:
+
+```{r}
+r <- 3
+Y <- scale(data[,-9])
+Y_pcs <- prcomp(Y)
+M_0 <- Y_pcs$rotation[,1:r] %*% diag(Y_pcs$sdev[1:r])
+S_y <- cov(Y)
+Sigma_nu_0 <- diag(diag(S_y - M_0 %*% t(M_0)))
+Sigma_nu_0
+```
+
+The estimation of M without varimax rotation is:
+
+```{r}
+MM <- S_y - Sigma_nu_0
+MM_eig <- eigen(MM)
+MM_values <- MM_eig$values
+MM_vectors <- MM_eig$vectors
+M_1 <- MM_eig$vectors[,1:r] %*% diag(MM_eig$values[1:r])^(1/2)
+M_1
+```
+
+After the varimax rotation, we arrive at the following: 
+
+```{r}
+M <- varimax(M_1)
+M <- loadings(M)[1:p,1:r]
+M
+Sigma_nu <- diag(diag(S_y - M %*% t(M)))
+Sigma_nu
+```
+
+
+```{r}
+X<-data[,-9]
+plot(1:p, M[,1], pch = 19, col = col1, xlab = "", ylab = "Loadings", main = "Loadings for the first factor")
+abline(h = 0)
+text(1:p, M[,1], labels = colnames(X), pos = 1, col = col2, cex = 0.75)
+```
+
+The first factor appears to be very related to skin thickness.
+
+```{r}
+plot(1:p, M[,2], pch = 19, col = col1, xlab = "", ylab = "Loadings", main = "Loadings for the second factor")
+abline(h = 0)
+text(1:p, M[,2], labels = colnames(X), pos = 1, col = col2, cex = 0.75)
+```
+
+The second factor appears to be very related to pregnancies and age. 
+
+```{r}
+plot(1:p, M[,3], pch = 19, col = col1, xlab = "", ylab = "Loadings", main = "Loadings for the first factor")
+abline(h = 0)
+text(1:p, M[,3], labels = colnames(X), pos = 1, col = col2, cex = 0.75)
+```
+The third factor appears to be related to log_Insulin and glucose. We lack the medical expertise to judge if this makes sense or not, but it is what our data says.
 
 

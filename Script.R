@@ -197,7 +197,7 @@ colnames(X)[7] <- "log_Diabetes\nPedigree\nFunction"
 # See what happens if we obtain PCs on the whole data set
 # Use the sample correlation matrix
 
-X_pcs <- prcomp(X,scale=TRUE)
+X_pcs <- prcomp(X, scale = TRUE)
 
 ##################################################################################################################
 # PC scores
@@ -220,24 +220,28 @@ plot(X_pcs$x[,1:2],pch=19,col=colors_X)
 plot(1:p,X_pcs$rotation[,1],pch=19,col=color_1,main="Loadings for the first PC",
      xlab="Variables",ylab="Score", ylim = c(0,0.5))
 abline(h=0)
-text(1:p,X_pcs$rotation[,1],labels=colnames(X),pos=1,col=color_2,cex=0.75)
+text(1:p, X_pcs$rotation[,1], labels = colnames(X),
+     pos = 1, col = color_2, cex = 0.75)
 
 ##################################################################################################################
 # Interpretation of the second PC: Loadings for the second PC
 
-plot(1:p,X_pcs$rotation[,2],pch=19,col=color_1,main="Loadings for the second PC",
-     xlab="Variables",ylab="Score")
-abline(h=0)
-text(1:p,X_pcs$rotation[,2],labels=colnames(X),pos=1,col=color_2,cex=0.75)
+plot(1:p,X_pcs$rotation[,2], pch = 19, col = color_1,
+     main = "Loadings for the second PC",
+     xlab = "Variables", ylab = "Score")
+abline(h = 0)
+text(1:p, X_pcs$rotation[,2], labels = colnames(X), pos = 1, 
+     col = color_2, cex = 0.75)
 
 ##################################################################################################################
 # Have a look at the important variables in the first two PCs
 # Note the different groups in the data
 # The radius is arbitrary
 
-plot(X_pcs$rotation[,1:2],pch=19,col=color_1,main="Weights for the first two PCs")
-abline(h=0,v=0)
-text(X_pcs$rotation[,1:2],labels=colnames(X),pos=1,col=color_2,cex=0.75)
+plot(X_pcs$rotation[,1:2], pch = 19, col = color_1, 
+     main = "Weights for the first two PCs")
+abline(h = 0, v = 0)
+text(X_pcs$rotation[,1:2],labels = colnames(X), pos = 1, col = color_2,cex=0.75)
 library(plotrix)
 #draw.circle(0,0,0.3,border=color_2,lwd=3)
 
@@ -245,7 +249,7 @@ library(plotrix)
 # The biplot is an alternative way to plot points and the first two PCs together 
 # However, it is only useful when the data set is not too large
 
-biplot(X_pcs,col=c(color_1,color_2),cex=c(0.5,0.8))
+biplot(X_pcs, col = c(color_1,color_2), cex = c(0.5,0.8))
 
 ##################################################################################################################
 # The eigenvalues of the sample correlation matrix of X_trans, i.e., the variances of the PCs are the square of sdev
@@ -286,7 +290,7 @@ plot(X_pcs$x[,1], X_pcs$x[,2], col = ifelse(Y==1,color_1, color_2))
 
 # The first one is a PC that creates a ranking of colleges. See the first ten colleges
 
-sort(X_pcs$x[,1],decreasing=TRUE)[1:10]
+sort(X_pcs$x[,1], decreasing = TRUE)[1:10]
 
 ##################################################################################################################
 # Plot the correlations between the original data set and the scores
