@@ -4,7 +4,6 @@ library(moments)
 library(nnet)
 library(naivebayes)
 library(pROC)
-library(ROCR)
 
 set.seed(100487766)
 
@@ -160,13 +159,15 @@ knn_TER <- mean(Y_test!=knn_Y_test)
 knn_TER
 
 prob_knn_Y_test <- attributes(knn_Y_test)$prob
+
+{
 head(prob_knn_Y_test)
 prob <- 2*ifelse(knn_Y_test == "-1", prob_knn_Y_test, 1-prob_knn_Y_test) - 1
 
 pred_knn <- prediction(prob, Y_test)
 pred_knn <- performance(pred_knn, "tpr", "fpr")
 plot(pred_knn, avg= "threshold", colorize=T, lwd=3, main="Voilà, a ROC curve!", asp=1)
-
+}
 
 # Make a plot of the probabilities of the winner group
 # In green, good classifications, in red, wrong classifications
@@ -239,14 +240,80 @@ final_df <- as.data.frame(cbind(X_train, Y_train))
 final_df$Y_train <- final_df$Y_train - 1
 mod_zero  <- glm(Y_train ~ 1, family = binomial, data = final_df)
 mod_all   <- glm(Y_train ~ ., family = binomial, data = final_df)
-both <- MASS::stepAIC(mod_zero, scope = list(lower = mod_zero, upper = mod_all),
+model_glm <- MASS::stepAIC(mod_zero, scope = list(lower = mod_zero, upper = mod_all),
                       direction = "both", trace = 0, k = log(nrow(final_df)))
-X_test_2 <- as.data.frame(X_test[, c("Glucose", "BMI", "Age", "DiabetesPedigreeFunction")])
-pred <- predict(both, X_test_2) > 0.1
-table(Y_test, pred)
+X_test_2 <- as.data.frame(X_test[, names(model_glm$coefficients)[-1]])
+pred <- predict(model_glm, X_test_2) > 0.1
+cm <- table(Y_test, pred)
 
-BAC <- (129/147 + 55/84)/2
+BAC <- ((cm[1,1]/(cm[1,1] + cm[1,2])) + (cm[2,2]/(cm[2,1] + cm[2,2])))/2
 BAC
+
+
+##### voy a hacer una ROC
+get_logistic_pred = function(mod, data, res = "y", pos = 1, neg = 0, cut = 0.5) {
+  probs = predict(mod, newdata = data, type = "response")
+  ifelse(probs > cut, pos, neg)
+}
+
+X_test_2 <- as.data.frame(X_test[, names(model_glm$coefficients)[-1]])
+
+test_pred_10 = get_logistic_pred(model_glm, data = X_test_2, res = "default", 
+                                 pos = 1, neg = 0, cut = 0.1)
+test_pred_50 = get_logistic_pred(model_glm, data = X_test_2, res = "default", 
+                                 pos = 1, neg = 0, cut = 0.5)
+test_pred_90 = get_logistic_pred(model_glm, data = X_test_2, res = "default", 
+                                 pos = 1, neg = 0, cut = 0.9)
+
+test_tab_10 = table(predicted = test_pred_10, actual = Y_test)
+test_tab_50 = table(predicted = test_pred_50, actual = Y_test)
+test_tab_90 = table(predicted = test_pred_90, actual = Y_test)
+
+test_con_mat_10 = confusionMatrix(test_tab_10, positive = "1")
+test_con_mat_50 = confusionMatrix(test_tab_50, positive = "1")
+test_con_mat_90 = confusionMatrix(test_tab_90, positive = "1")
+
+metrics = rbind(
+  
+  c(test_con_mat_10$overall["Accuracy"], 
+    test_con_mat_10$byClass["Sensitivity"], 
+    test_con_mat_10$byClass["Specificity"]),
+  
+  c(test_con_mat_50$overall["Accuracy"], 
+    test_con_mat_50$byClass["Sensitivity"], 
+    test_con_mat_50$byClass["Specificity"]),
+  
+  c(test_con_mat_90$overall["Accuracy"], 
+    test_con_mat_90$byClass["Sensitivity"], 
+    test_con_mat_90$byClass["Specificity"])
+  
+)
+
+
+
+rownames(metrics) = c("c = 0.10", "c = 0.50", "c = 0.90")
+colnames(metrics) = c("Accuracy", "Sensitivity", "Specificity")
+
+metrics
+
+test_prob = predict(model_glm, newdata = X_test_2, type = "response")
+test_roc = roc(Y_test ~ test_prob, plot = TRUE, print.auc = TRUE)
+
+ROC = plot.roc(Y_test, test_prob,
+         main="Confidence interval of a threshold", percent=TRUE,
+         ci=TRUE, of="thresholds", # compute AUC (of threshold)
+         thresholds="best", # select the (best) threshold
+         print.thres="best",
+         print.auc=TRUE) # also highlight this threshold on the plot
+ROC
+
+pred <- predict(model_glm, X_test_2, type = "response") > as.numeric(rownames(ROC$ci$specificity))
+pred <- pred * 1
+cm <- table(Y_test, pred)
+
+BAC <- ((cm[1,1]/(cm[1,1] + cm[1,2])) + (cm[2,2]/(cm[2,1] + cm[2,2])))/2
+BAC
+
 ###
 
 # Have a look at the important variables that have been retained in the model
@@ -333,6 +400,20 @@ plot(1:n_test,prob_lda_Y_test[,1],col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of non diabetes",
      main="Probabilities of non diabetes")
 abline(h=0.5)
+
+test_prob = predict(lda_train, newdata = as.data.frame(X_test), type = "response")
+test_prob <- test_prob$posterior[,1]
+test_roc = roc(Y_test ~ test_prob, plot = TRUE, print.auc = TRUE)
+
+ROC = plot.roc(Y_test, test_prob,
+               main="Confidence interval of a threshold", percent=TRUE,
+               ci=TRUE, of="thresholds", # compute AUC (of threshold)
+               thresholds="best", # select the (best) threshold
+               print.thres="best",
+               print.auc=TRUE) # also highlight this threshold on the plot
+ROC
+
+
 }
 
 ### QDA
@@ -366,6 +447,20 @@ plot(1:n_test,prob_qda_Y_test[,1],col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of nonspam",
      main="Probabilities of nonspam")
 abline(h=0.5)
+
+test_prob = predict(qda_train, newdata = as.data.frame(X_test), type = "response")
+test_prob <- test_prob$posterior[,1]
+test_roc = roc(Y_test ~ test_prob, plot = TRUE, print.auc = TRUE)
+
+ROC = plot.roc(Y_test, test_prob,
+               main="Confidence interval of a threshold", percent=TRUE,
+               ci=TRUE, of="thresholds", # compute AUC (of threshold)
+               thresholds="best", # select the (best) threshold
+               print.thres="best",
+               print.auc=TRUE) # also highlight this threshold on the plot
+ROC
+
+
 }
 
 ### NB
@@ -420,13 +515,17 @@ plot(1:n_test,prob_nb_Y_test[,1],col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of non diabetes",
      main="Probabilities of non diabetes")
 abline(h=0.5)
+
+test_prob = predict(nb_train, newdata = X_test, type = "prob")
+test_prob <- test_prob[,2]
+test_roc = roc(Y_test ~ test_prob, plot = TRUE, print.auc = TRUE)
+
+ROC = plot.roc(Y_test, test_prob,
+               main="Confidence interval of a threshold", percent=TRUE,
+               ci=TRUE, of="thresholds", # compute AUC (of threshold)
+               thresholds="best", # select the (best) threshold
+               print.thres="best",
+               print.auc=TRUE) # also highlight this threshold on the plot
+ROC
 }
 
-### Random Forest (no añadir)
-{
-library(randomForest)
-df_train <- df[i_train,]
-df_test <- df[-i_train,]
-modelo <- randomForest(Outcome~., data=df_train)
-modelo
-}
