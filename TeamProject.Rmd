@@ -10,118 +10,239 @@ header-includes:
   - \renewcommand{\and}{\\}
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = F, message = F)
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+require(tidyverse)
+require(mice)
+require(visdat)
 ```
 
-# Descriptive analysis
+# Descriptive Analysis and Preprocessing
 
 ## Reading the data and setting the NAs
 
-First, we read the data using the `read.csv` function:
+Before starting the analysis, we need to make some preprocessing on our data.
+Let us start by loading it into memory and listing the names of the columns.
+
 ```{r}
 data <- read.csv("diabetes.csv")
-```
-The names of the variables are the following ones:
-```{r}
 colnames(data)
 ```
 
-We also want to transform the *Outcome* variable to a factor variable. We can do that using the `factor` function:
+Of these, our target variable is `Outcome`, which has two levels.
+For convenience, we transform it into a factor variable which R can trat accordingly.
+
 ```{r}
-data$Outcome <- factor(data$Outcome, c(0,1))
+data$Outcome <- factor(data$Outcome, c(0, 1), c("Negative", "Positive"))
 ```
 
-After that, we are going to treat as NAs (Not Available data) all 0 values of the following variables:
+Now we need to address a particularity of the chosen data:
+not-a-number (NaN) instances are encoded as zeros in variables
+where that value is imposible [^1].
+These are:
 
 - Glucose
+
 - BloodPressure
+
 - SkinThickness
+
 - Insulin
+
 - BMI
 
-In order to do that, we define the following function:
+In order for us to later trat them correctly, we need to manually
+change them to the existing `NA` type.
+As we do so, we record the number of NaNs instances in each of those variables.
+For convenience, we define a function.
+
+[^1]: Remember we are dealing with medical data, not with artificial one.
+Hence, there are constraints on the values a variable may take.
+
 ```{r}
-setNAs <- function(data, fields){
-  percentage <- list()
-  for (field in fields){
-    data[[field]][data[[field]] == 0] <- NA
-    percentage[[field]] <- 100*sum(is.na(data[[field]]))/nrow(data)
-  }
-  return (list(data = data, percentage = percentage))
+set_nas <- function(data, fields) {
+    percentage <- list()
+    for (field in fields) {
+        data[[field]][data[[field]] == 0]   <- NA
+        percentage[[field]] <- 100 * sum(is.na(data[[field]])) / nrow(data)
+    }
+    return(list(data = data, percentage = percentage))
+}
+
+# Correctly label NaNs
+na_fields   <- c("Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI")
+data_na     <- set_nas(data, na_fields)
+data        <- data_na$data
+percentages <- data_na$percentage
+
+# Visualize them
+vis_miss(data)
+```
+
+Now the next logical step is to impute those NaN values.
+We do have some concern about the imputation of the "Insulin" variable
+which is almost half-filled of NaNs.
+Nevertheless, we decide to impute it.
+On the followed strategy, we use the "Predictive Mean Matching Imputation"
+(PMM in short) as it behaves much more robustly than naive
+mean or median imputations.
+
+```{r}
+data_im <- mice(data, m = 1, method = "pmm")
+data    <- complete(data_im)
+```
+
+## Visualization of the data
+
+Before we proceed any further, we are going to describe our data.
+First, we look individually to each of the attributes,
+we see both visually and with with a two-sample Wilcox-test whether there
+is significant difference between the two groups (having or not diabetes),
+and if some transformation may be desirable to ensure normality compatibility.
+For that purpose, we define the following function.
+
+```{r}
+histogram_by_groups <- function(data, var, label = NULL) {
+    stat_t <- wilcox.test(as.formula(paste(var, "~ Outcome")), data)
+    data0  <- data[data$Outcome == "Negative", ]
+    data1  <- data[data$Outcome == "Positive", ]
+    if (is.null(label)) {
+        label <- var
+    }
+    p <- ggplot(data0, aes(x = eval(parse(text = var)))) +
+        geom_histogram(
+            aes(y = after_stat(count / sum(count)), fill = "Negative"),
+            bins = 10, colour = "white", alpha = 0.8, boundary = 0
+            ) +
+        geom_histogram(data = data1,
+            aes(
+                x = eval(parse(text = var)),
+                y = after_stat(count / sum(count)), fill = "Positive"
+                ),
+            bins = 10, colour = "white",
+            alpha = 0.5, boundary = 0, inherit.aes = FALSE) +
+            theme_bw() +
+            scale_fill_manual(
+                name = "",
+                breaks = c("Positive", "Negative"),
+                values = c("Positive" = "deeppink4", "Negative" = "pink2")
+            ) +
+            xlab(label) + ylab("Relative frequency") + ggtitle(label) +
+            geom_vline(xintercept = mean(data1[[var]]), colour = "deeppink4") +
+            geom_vline(xintercept = mean(data0[[var]]), colour = "pink2")
+    p + annotate(
+            "text",
+            x = 0.75 * max(data[var]),
+            y = 0.75 * max(ggplot_build(p)$data[[1]]["y"]),
+            label = sprintf("p-value = %.4e", stat_t$p.value),
+            size = 1
+        )
 }
 ```
 
-Once the function is defined, we set the NAs, modify the data and save the NA percentages for each of the five variables:
+Let us start with the number of pregnancies.
+We see that it seems to be somewhat based on the p-value alone.
+We also note it exhibits a heavily right-skewed behaviour.
+As such, a logarithmic transformation would make sense to get
+a distribution more compatible with the normal one.
+Nonetheless, a problem here arises in dealing with the null values [^2].
+For that purpose we shift the variable by one unit.
 
-```{r}
-NAfields    <- c("Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI")
-dataNA      <- setNAs(data, NAfields)
-data        <- dataNA$data
-percentages <- dataNA$percentage
+[^2]: Remember the domain of the logarithmic function is $(0, \infty)$.
+
+```{r, fig.dim = c(8, 4)}
+histogram_by_groups(data, "Pregnancies")
 ```
 
-## Outliers
+The change as we see does help in obtaining a more
+centered distribution with which we may better apply
+the posterior analysis.
 
-**Esto no es mega correcto no?? Para variables no normales no podemos obtener resultados algo xd??**
-
-We define the function `findOutliers`:
-
-```{r}
-findOutliers <- function(data, fields){
-  outliers <- list()
-  for (field in fields){
-    qs  <- quantile(data[[field]], c(0.25, 0.75), na.rm = TRUE)
-    iqr <- qs[2] - qs[1]
-    lq  <- qs[1] - 1.5*iqr
-    hq  <- qs[2] + 1.5*iqr
-    outliers[[field]] <- which((data[[field]] < lq) & (data[[field]] > hq))
-  }
-  return (outliers)
-}
+```{r, fig.dim = c(8, 4)}
+data_trf <- data
+data_trf$Pregnancies <- log(data_trf$Pregnancies + 1)
+histogram_by_groups(data_trf, "Pregnancies", "log(Pregnancies + 1)")
 ```
 
-And we save the outliers in a new variable:
-```{r}
-outliers <- findOutliers(data, names(data)[names(data) != "Outcome"])
+The next variable to visualize is the glucose.
+The p-value  is very small which
+indicates a highly significant difference between the two groups.
+We also observe that the distribution is already
+well-centered and resembles a normal distribution.
+Hence, we decide not to transform the data.
+
+```{r, fig.dim = c(8, 4)}
+histogram_by_groups(data, "Glucose")
 ```
 
-## Fill NAs (Predictive Mean Matching)
+We move onwards to blood pressure.
+In this case, although the distributions appear
+as normal, there does not seem to exist a highly significant
+difference between the groups in contrast to what the p-value states,
+more so compared with the glucose variable.
 
-If we look at the variable **percentages** (that contain the percentage of NAs for each one of the five variables contained in **NAfields**), we can see that the percentage of NAs for both the variable *Insulin* and the variable *SkinThickness* are big (48.7\% and 29.56\%). Performing imputation for variables with such a big number of NAs is not a good idea, so we are going to remove all instaces with NA values in that variables.
-
-Fortunatelly, there is a overlaping in the instances with NA value in *SkinThickness* and *Insulin*. As we can see in the following chunk of code, all the instances with NA value for the *SkinThickness* also have NA value in the *Insulin* variable:
-
-```{r}
-sum(is.na((data[is.na(data$SkinThickness),]$Insulin))) ==
-  nrow(data[is.na(data$SkinThickness),])
+```{r, fig.dim = c(8, 4)}
+histogram_by_groups(data, "BloodPressure")
 ```
 
-We keep only the instances with non-NA value for the *Insulin* variable:
+Now skin thickness is interesting, because the distributions
+are visually to those of the blood pressure but the presence
+of outliers is appreciable.
+We will later deal with those but for now let us
+mantain this variable as it is.
 
-```{r}
-data <- data[!is.na(data$Insulin),]
+```{r, fig.dim = c(8, 4)}
+histogram_by_groups(data, "SkinThickness")
 ```
 
-Finally, we impute the data using the `mice` package with the **Predictive Mean Matching** method (`method = "pmm"`):
-```{r}
-require(mice)
-dataIm <- mice(data, m = 1, method = "pmm")
-data2 <- complete(dataIm)
+Insulin, as we may have expected from the name of the property
+itself, appears to be a relevant.
+It is also right-skewed, so we decide to log-transform it.
+
+```{r, fig.dim = c(8, 4)}
+histogram_by_groups(data, "Insulin")
 ```
 
+It does appear that the transformation impproves the
+the symmetrization of the data, although some left-skewness
+appears.
+We will later see if outlier detection get to
+target those values or not.
 
+```{r, fig.dim = c(8, 4)}
+data_trf$Insulin <- log(data_trf$Insulin)
+histogram_by_groups(data_trf, "Insulin", "log(Insulin)")
+```
 
+Body Mass Index (BMI) again exhibits this tendency of
+leaning towards a more right-skewed distribution.
+As such we log-transform to try and get a more normalized variable.
 
+```{r, fig.dim = c(8, 4)}
+histogram_by_groups(data, "BMI")
+```
 
+As we may visually judge, it is the case
+that the log transformation centers the data
+and provides a more normal-like distribution.
+There is some presence of seemingly outlying points
+to the right.
 
+```{r, fig.dim = c(8, 4)}
+data_trf$BMI <- log(data_trf$BMI)
+histogram_by_groups(data_trf, "BMI", "log(BMI)")
+```
 
+The Diabetes Pedigree Function (DPF) is the
+most flagrant right-skewed of those which we have
+seen so far.
+Let us try to log-transform it.
 
+```{r, fig.dim = c(8, 4)}
+histogram_by_groups(data, "DiabetesPedigreeFunction", "DPF")
+```
 
-
-
-
-
-
-
-
+```{r, fig.dim = c(8, 4)}
+data_trf$DPF <- log(data_trf$DiabetesPedigreeFunction)
+histogram_by_groups(data_trf, "DPF", "log(DPF)")
+```
