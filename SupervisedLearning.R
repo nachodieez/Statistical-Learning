@@ -3,7 +3,8 @@ library(MASS)
 library(moments)
 library(nnet)
 library(naivebayes)
-
+library(pROC)
+library(ROCR)
 
 set.seed(100487766)
 
@@ -65,14 +66,14 @@ color_4 <- "indianred2"
 ### Data things
 {
 df = load_data()
-X <- df[, 1:8]
-Y <- df[, 9]
+X <- df[,1:8]
+Y <- df[,9]
 X <- scale(X, center=F) #center = T, tal vez cambiar a F
-X <-
 
 n <- nrow(X)
 p <- ncol(X)
 c(n,p)
+
 
 n_no <- sum(Y==0)
 n_yes <- sum(Y==1)
@@ -160,6 +161,12 @@ knn_TER
 
 prob_knn_Y_test <- attributes(knn_Y_test)$prob
 head(prob_knn_Y_test)
+prob <- 2*ifelse(knn_Y_test == "-1", prob_knn_Y_test, 1-prob_knn_Y_test) - 1
+
+pred_knn <- prediction(prob, Y_test)
+pred_knn <- performance(pred_knn, "tpr", "fpr")
+plot(pred_knn, avg= "threshold", colorize=T, lwd=3, main="Voilà, a ROC curve!", asp=1)
+
 
 # Make a plot of the probabilities of the winner group
 # In green, good classifications, in red, wrong classifications
@@ -226,6 +233,21 @@ abline(h=0.5)
 
 step_lr_train <- step(lr_train,direction="backward",trace=0)
 step_lr_train
+
+### BIC
+final_df <- as.data.frame(cbind(X_train, Y_train))
+final_df$Y_train <- final_df$Y_train - 1
+mod_zero  <- glm(Y_train ~ 1, family = binomial, data = final_df)
+mod_all   <- glm(Y_train ~ ., family = binomial, data = final_df)
+both <- MASS::stepAIC(mod_zero, scope = list(lower = mod_zero, upper = mod_all),
+                      direction = "both", trace = 0, k = log(nrow(final_df)))
+X_test_2 <- as.data.frame(X_test[, c("Glucose", "BMI", "Age", "DiabetesPedigreeFunction")])
+pred <- predict(both, X_test_2) > 0.1
+table(Y_test, pred)
+
+BAC <- (129/147 + 55/84)/2
+BAC
+###
 
 # Have a look at the important variables that have been retained in the model
 

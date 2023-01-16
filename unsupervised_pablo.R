@@ -8,10 +8,54 @@ require(corpcor)
 require(RSpectra)
 require(factoextra)
 
-data <- read.csv("diabetes.csv")
-data$Insulin[data$Insulin == 0] <- NA
-dataIm <- mice(data, m = 1, method = "pmm")
-data <- complete(dataIm)
+load_data <- function(){
+  data <- read.csv("diabetes.csv")
+  data$Outcome <- factor(data$Outcome, c(0,1))
+  
+  setNAs <- function(data, fields){
+    percentage <- list()
+    for (field in fields){
+      data[[field]][data[[field]] == 0] <- NA
+      percentage[[field]] <- 100*sum(is.na(data[[field]]))/nrow(data)
+    }
+    return (list(data = data, percentage = percentage))
+  }
+  
+  NAfields    <- c("Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI")
+  dataNA      <- setNAs(data, NAfields)
+  data        <- dataNA$data
+  percentages <- dataNA$percentage
+  
+  ## Outliers
+  
+  findOutliers <- function(data, fields){
+    outliers <- list()
+    for (field in fields){
+      qs  <- quantile(data[[field]], c(0.25, 0.75), na.rm = TRUE)
+      iqr <- qs[2] - qs[1]
+      lq  <- qs[1] - 1.5*iqr
+      hq  <- qs[2] + 1.5*iqr
+      outliers[[field]] <- which((data[[field]] < lq) & (data[[field]] > hq))
+    }
+    return (outliers)
+  }
+  
+  outliers <- findOutliers(data, names(data)[names(data) != "Outcome"])
+  
+  ## Fill NAs (Predictive Mean Matching)
+  
+  # Drop individuals with missing insulin (48%)
+  
+  sum(is.na((data[is.na(data$SkinThickness),]$Insulin))) == nrow(data[is.na(data$SkinThickness),])
+  dim(data[is.na(data$Insulin),])
+  
+  #data <- data[!is.na(data$Insulin),]
+  require(mice)
+  dataIm <- mice(data, m = 1, method = "pmm")
+  df <- complete(dataIm)
+  return(df)
+}
+data <- load_data()
 
 c1 <- "deeppink4"
 c2 <- "gold2"
@@ -65,10 +109,11 @@ rect.hclust(ward_X, k = 2, border = c1)
 cl_ward_X <- cutree(ward_X, 2)
 cl_ward_X
 table(cl_ward_X)
-table(cl_ward_X, -y+1)
+table(cl_ward_X, -as.numeric(y)+1)
 #bastante mejor 
 
 sil_ward_X <- silhouette(cl_ward_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_ward_X)
 plot(sil_ward_X, col = c1)
 #que cojones
 
@@ -83,6 +128,7 @@ table(cl_complete_X, y)
 #bastante razonable
 
 sil_complete_X <- silhouette(cl_complete_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_complete_X)
 plot(sil_complete_X, col = c1)
 #que cojones
 
@@ -97,6 +143,7 @@ table(cl_average_X, y)
 #fatal
 
 sil_average_X <- silhouette(cl_average_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_average_X)
 plot(sil_average_X, col = c1)
 #que cojones
 
@@ -118,6 +165,7 @@ plot(X3[,1:2], col = kmeans_col, main = "First two PCs",
      xlab = "First PC", ylab = "Second PC")
 #de super puta madre
 sil_kmeans_X <- silhouette(kmeans_X$cluster, euc_dist_X)
+factoextra::fviz_silhouette(sil_kmeans_X)
 plot(sil_kmeans_X, col = c1)
 
 pam_X <- pam(X3, k = 2, metric = "euclidean", stand = FALSE)
@@ -130,6 +178,7 @@ plot(X3[,1:2], col = pam_col, main = "First two PCs",
 table(pam_X$cluster, kmeans_X$cluster)
 
 sil_pam_X <- silhouette(pam_X$cluster, euc_dist_X)
+factoextra::fviz_silhouette(sil_pam_X)
 plot(sil_pam_X, col = c1)
 #que cojones
 
@@ -171,5 +220,5 @@ X[pam_X_euc_mat$medoids,]
 # Have a look at the silhouette
 
 sil_pam_X_euc_mat <- silhouette(pam_X_euc_mat$cluster, euc_dist_X)
-plot(sil_pam_X_euc_mat, col = c1)
+factoextra::fviz_silhouette(sil_pam_X_euc_mat)
 summary(sil_pam_X_euc_mat)
