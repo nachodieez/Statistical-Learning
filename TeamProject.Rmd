@@ -242,7 +242,31 @@ Let us try to log-transform it.
 histogram_by_groups(data, "DiabetesPedigreeFunction", "DPF")
 ```
 
+The improvement is highly noticeable.
+We retain thus this transformed variable.
+
 ```{r, fig.dim = c(8, 4)}
 data_trf$DPF <- log(data_trf$DiabetesPedigreeFunction)
 histogram_by_groups(data_trf, "DPF", "log(DPF)")
+```
+
+The age is expected to exhibit a right-skewed
+distribution.
+We confirm that this is indeed the case.
+As such we once again use logarithms to transform
+the variable.
+
+```{r, fig.dim = c(8, 4)}
+histogram_by_groups(data, "Age")
+```
+
+The transformation does help although
+not by much.
+This is a common problem of the age variable.
+We will keep the transformation anyways and
+assume normality for the rest of the project.
+
+```{r, fig.dim = c(8, 4)}
+data_trf$Age <- log(data_trf$Age)
+histogram_by_groups(data_trf, "Age", "log(Age)")
 ```
