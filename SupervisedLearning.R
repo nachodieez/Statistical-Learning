@@ -58,7 +58,7 @@ load_data <- function(){
 df = load_data()
 X <- df[,1:8]
 Y <- df[,9]
- ### empezar aquí
+### empezar aquí
 ### Colors to be used in the script
 
 color_1 <- "deepskyblue2"
@@ -176,7 +176,7 @@ plot(1:n_test,prob_knn_Y_test,col=colors_errors,pch=20,type="p",
 
 ### Logistic regression
 {
-lr_train <- multinom(Y_train~.,data=as.data.frame(X_train))
+lr_train <- multinom(Y_train~.,data=X_train)
 
 # Have a look at the estimated coefficients and their standard errors
 summary(lr_train)
@@ -305,12 +305,14 @@ ROC = plot.roc(Y_test, test_prob,
          print.auc=TRUE) # also highlight this threshold on the plot
 ROC
 
-pred <- predict(model_glm, X_test_2, type = "response") > as.numeric(rownames(ROC$ci$specificity))
+pred <- predict(model_glm, X_test_2, type = "response") > 
+  as.numeric(rownames(ROC$ci$specificity))
 pred <- pred * 1
 cm <- table(Y_test, pred)
 
 BAC <- ((cm[1,1]/(cm[1,1] + cm[1,2])) + (cm[2,2]/(cm[2,1] + cm[2,2])))/2
 BAC
+
 
 ###
 
