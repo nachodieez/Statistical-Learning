@@ -4,6 +4,7 @@ library(moments)
 library(nnet)
 library(naivebayes)
 library(pROC)
+library(caret)
 
 set.seed(100487766)
 
@@ -54,19 +55,22 @@ load_data <- function(){
   df <- complete(dataIm)
   return(df)
 }
-
+df = load_data()
+X <- df[,1:8]
+Y <- df[,9]
+ ### empezar aquí
 ### Colors to be used in the script
 
 color_1 <- "deepskyblue2"
 color_2 <- "darkorchid4"
 color_3 <- "seagreen2"
 color_4 <- "indianred2"
+  
+X <- df_clean[,xnames]
+Y <- df_clean$Outcome
 
 ### Data things
 {
-df = load_data()
-X <- df[,1:8]
-Y <- df[,9]
 X <- scale(X, center=F) #center = T, tal vez cambiar a F
 
 n <- nrow(X)
@@ -74,8 +78,8 @@ p <- ncol(X)
 c(n,p)
 
 
-n_no <- sum(Y==0)
-n_yes <- sum(Y==1)
+n_no <- sum(Y=="Negative")
+n_yes <- sum(Y=="Positive")
 c(n_no,n_yes)
 
 pr_no <- n_no/n
@@ -93,15 +97,15 @@ X_test <- X[-i_train,]
 Y_train <- Y[i_train]
 Y_test <- Y[-i_train]
 
-sum(Y_train==0)/n_train
-sum(Y_train==1)/n_train
-sum(Y_test==0)/n_test
-sum(Y_test==1)/n_test
+sum(Y_train=="Negative")/n_train
+sum(Y_train=="Positive")/n_train
+sum(Y_test=="Negative")/n_test
+sum(Y_test=="Positive")/n_test
 }
 
 ### Visual analysis
 {
-colors_Y <- c(color_1,color_2)[1*(Y==1)+1]
+colors_Y <- c(color_1,color_2)[1*(Y=="Positive")+1]
 parcoord(X,col=colors_Y,var.label=F,main="PCP for the diabetes data set")
 
 X_skewness <- apply(X,2,skewness)
@@ -121,21 +125,14 @@ plot(1:p,apply(X_log,2,skewness),type="h",pch=19,col=color_1,
      xlab="Variables",ylab="Skewness coefficients",main="Skewness coefficients")
 
 # PCA
-X_log_pcs <- prcomp(X_log,scale=TRUE)
-summary(X_log_pcs)
+X_pcs <- prcomp(X,scale=TRUE)
+summary(X_pcs)
 
 # Make a plot of the first two PCs
 
-plot(X_log_pcs$x[,1:2],pch=20,col=colors_Y,xlim=c(-5,5),ylim=c(-5,5),
+plot(X_pcs$x[,1:2],pch=20,col=colors_Y,xlim=c(-5,5),ylim=c(-5,5),
      main="First two PCs for the logs of diabetes data set")
 #there is a lot of overlapping between the groups
-}
-
-### Logs? (no parecen afectar mucho al resultado)
-{
-X <- log(X+1)
-X_train <- X[i_train,]
-X_test <- X[-i_train,]
 }
 
 ### KNN
@@ -244,6 +241,7 @@ model_glm <- MASS::stepAIC(mod_zero, scope = list(lower = mod_zero, upper = mod_
                       direction = "both", trace = 0, k = log(nrow(final_df)))
 X_test_2 <- as.data.frame(X_test[, names(model_glm$coefficients)[-1]])
 pred <- predict(model_glm, X_test_2) > 0.1
+pred <- c("Negative", "Positive")[(1*pred)+1]
 cm <- table(Y_test, pred)
 
 BAC <- ((cm[1,1]/(cm[1,1] + cm[1,2])) + (cm[2,2]/(cm[2,1] + cm[2,2])))/2
@@ -251,7 +249,7 @@ BAC
 
 
 ##### voy a hacer una ROC
-get_logistic_pred = function(mod, data, res = "y", pos = 1, neg = 0, cut = 0.5) {
+get_logistic_pred = function(mod, data, res = "y", pos = "Positive", neg = "Negative", cut = 0.5) {
   probs = predict(mod, newdata = data, type = "response")
   ifelse(probs > cut, pos, neg)
 }
@@ -259,19 +257,19 @@ get_logistic_pred = function(mod, data, res = "y", pos = 1, neg = 0, cut = 0.5) 
 X_test_2 <- as.data.frame(X_test[, names(model_glm$coefficients)[-1]])
 
 test_pred_10 = get_logistic_pred(model_glm, data = X_test_2, res = "default", 
-                                 pos = 1, neg = 0, cut = 0.1)
+                                 cut = 0.1)
 test_pred_50 = get_logistic_pred(model_glm, data = X_test_2, res = "default", 
-                                 pos = 1, neg = 0, cut = 0.5)
+                                 cut = 0.5)
 test_pred_90 = get_logistic_pred(model_glm, data = X_test_2, res = "default", 
-                                 pos = 1, neg = 0, cut = 0.9)
+                                 cut = 0.9)
 
 test_tab_10 = table(predicted = test_pred_10, actual = Y_test)
 test_tab_50 = table(predicted = test_pred_50, actual = Y_test)
 test_tab_90 = table(predicted = test_pred_90, actual = Y_test)
 
-test_con_mat_10 = confusionMatrix(test_tab_10, positive = "1")
-test_con_mat_50 = confusionMatrix(test_tab_50, positive = "1")
-test_con_mat_90 = confusionMatrix(test_tab_90, positive = "1")
+test_con_mat_10 = confusionMatrix(test_tab_10, positive = "Positive")
+test_con_mat_50 = confusionMatrix(test_tab_50, positive = "Positive")
+test_con_mat_90 = confusionMatrix(test_tab_90, positive = "Positive")
 
 metrics = rbind(
   
