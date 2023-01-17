@@ -44,6 +44,8 @@ For convenience, we transform it into a factor variable which R can trat accordi
 data$Outcome <- factor(data$Outcome, c(0, 1), c("Negative", "Positive"))
 ```
 
+<!-- Up to this point this would go in the introduction -->
+
 Now we need to address a particularity of the chosen data:
 not-a-number (NaN) instances are encoded as zeros in variables
 where that value is imposible [^1].
@@ -348,7 +350,7 @@ of the data to use, at $0.85$.
 
 <!-- TODO: refactor the prints -->
 
-```{r, fig.size = c(8,8)}
+```{r}
 our_corrplot <- function(cov_mat) {
     colnames(cov_mat) <- c("Log\nPregnancies",
                            "Glucose",
@@ -364,12 +366,16 @@ our_corrplot <- function(cov_mat) {
 }
 
 mcd_est <- CovMcd(df[xnames], alpha = 0.85, nsamp = "deterministic")
+```
 
+```{r, echo = FALSE, fig.size = c(8,8)}
 print("The mean vector is:")
 print(mcd_est$center)
 print("The covariance matrix is:")
-print(mcd_est$cov)
+print(round(mcd_est$cov, 4))
+```
 
+```{r, fig.size = c(8,8)}
 our_corrplot(mcd_est$cov)
 ```
 
@@ -381,25 +387,33 @@ matrix for each of the classes, and the outliers for both sets.
 ```{r, fig.size = c(8,8)}
 mcd_neg <- CovMcd(df0[xnames], alpha = 0.85, nsamp = "deterministic")
 mcd_pos <- CovMcd(df1[xnames], alpha = 0.85, nsamp = "deterministic")
+```
 
+```{r, echo = FALSE, fig.size = c(8,8)}
 print("### Negative class ###")
 print("The mean vector is:")
 print(mcd_neg$center)
 print("The covariance matrix is:")
-print(mcd_neg$cov)
+print(round(mcd_neg$cov, 4))
+```
 
+```{r, fig.size = c(8,8)}
 our_corrplot(mcd_neg$cov)
+```
 
+```{r, echo = FALSE, fig.size = c(8,8)}
 print("### Positive class ###")
 print("The mean vector is:")
 print(mcd_pos$center)
 print("The covariance matrix is:")
-print(mcd_pos$cov)
+print(round(mcd_pos$cov, 4))
+```
 
+```{r, fig.size = c(8,8)}
 our_corrplot(mcd_pos$cov)
 ```
 
-Le us focus first on the mean vectors.
+Let us focus first on the mean vectors.
 The here observed particularities are nothing new,
 as they were already present on above histograms:
 
@@ -418,29 +432,28 @@ for the sane group while negative on the positive one.
 
 [^3]: Remember this is the logarithm.
 
-<!-- Perhaps change 0.975 to 0.99 so
-it is less strict -->
-
 We now search for outliers.
 The idea is to use Mahalanobis distance.
-As we suppose that our data $X ~ \mathcal{N}(\mu, \Sigma)$,
+As we suppose that our data $X \sim \mathcal{N}(\mu, \Sigma)$,
 we have $D_M(x,\mu)^2 \sim \chi_p^2$, with $D_M$ the
 Mahalanobis distance.
 Hence we may set our outlier criteria as
 \begin{equation}
-    D_M(x, \mu)^2 > \chi_{p, 0.975^{1/n}}^2 \;,
+    D_M(x, \mu)^2 > \chi_{p, 0.95^{1/n}}^2 \;,
 \end{equation}
-the $0.975^\text{th}$ quantile of the $\chi_p^2$ distribution.
+the $0.95^\text{th}$ quantile of the $\chi_p^2$ distribution.
 We then drop these outliers.
 
 ```{r}
 p   <- length(xnames)
 n0  <- nrow(df0)
 n1  <- nrow(df1)
-df0_clean <- df0[mcd_neg$mah^2 < qchisq(0.975^(1 / n0), p), ]
-df1_clean <- df1[mcd_pos$mah^2 < qchisq(0.975^(1 / n1), p), ]
+df0_clean <- df0[mcd_neg$mah < qchisq(0.95^(1 / n0), p), ]
+df1_clean <- df1[mcd_pos$mah < qchisq(0.95^(1 / n1), p), ]
 df_clean  <- rbind(df0_clean, df1_clean)
+```
 
+```{r, echo = FALSE}
 print(paste("The negative set contained", n0 - nrow(df0_clean), "outliers."))
 print(paste("The positive set contained", n1 - nrow(df1_clean), "outliers."))
 ```
@@ -461,3 +474,6 @@ ggpairs(df_clean, aes(color = Outcome), legend = 1,
 ```
 
 <!-- TODO: PCA -->
+<!-- definitive data: df_clean -->
+<!-- definitive attributes: df_clean[, xnames] -->
+<!-- definitive objective variable: df_clean$Outcome -->
