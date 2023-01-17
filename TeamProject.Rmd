@@ -474,6 +474,8 @@ ggpairs(df_clean, aes(color = Outcome), legend = 1,
 ```
 
 <!-- TODO: PCA -->
+$\bar{x} = \frac{1}{n}\sum_{i=1}^n x_i$
+$a^2 = b^2 + c^2$
 <!-- definitive data: df_clean -->
 <!-- definitive attributes: df_clean[, xnames] -->
 <!-- definitive objective variable: df_clean$Outcome -->
