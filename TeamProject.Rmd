@@ -480,7 +480,6 @@ ggpairs(df_clean, aes(color = Outcome), legend = 1,
     scale_color_manual(values = c("pink", "deeppink4")) + labs(fill = "Outcome")
 ```
 
-<!-- TODO: PCA -->
 # Multivariate analysis and dimensionality reduction
 
 Our data has few variables, which makes dimensionality
@@ -846,6 +845,10 @@ the data.
 However, given they do not seem crucial for the analysis,
 we decide to keep them.
 
-<!-- definitive data: df_clean -->
-<!-- definitive attributes: df_clean[, xnames] -->
-<!-- definitive objective variable: df_clean$Outcome -->
+<!-- Definitive datasets:
+- df_clean for the cleaned data (already shuffled)
+- df_sc for the cleaned and scaled data (already shuffled)
+
+To access the attributes: df_whatever[, xnames]
+
+To access the objective function: df_whatever$Outcome -->
