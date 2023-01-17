@@ -12,10 +12,18 @@ header-includes:
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+require(ggplot2)
 require(tidyverse)
 require(mice)
 require(visdat)
+require(MASS)
+require(pracma)
+require(rrcov)
+require(corrplot)
+require(GGally)
 ```
+
+<!-- TODO: Introduction -->
 
 # Descriptive Analysis and Preprocessing
 
@@ -132,21 +140,25 @@ histogram_by_groups <- function(data, var, label = NULL) {
             geom_vline(xintercept = mean(data0[[var]]), colour = "pink2")
     p + annotate(
             "text",
-            x = 0.75 * max(data[var]),
-            y = 0.75 * max(ggplot_build(p)$data[[1]]["y"]),
+            x = 0.9 * max(data1[var]),
+            y = 0.9 * max(ggplot_build(p)$data[[1]]["y"]),
             label = sprintf("p-value = %.4e", stat_t$p.value),
-            size = 1
+            size = 3
         )
 }
 ```
 
 Let us start with the number of pregnancies.
+We can see that people who have diabetes have had more
+pregnancies than those who do not have diabetes.
 We see that it seems to be somewhat based on the p-value alone.
 We also note it exhibits a heavily right-skewed behaviour.
 As such, a logarithmic transformation would make sense to get
 a distribution more compatible with the normal one.
 Nonetheless, a problem here arises in dealing with the null values [^2].
 For that purpose we shift the variable by one unit.
+As a consistency measure, we will apply this shift to all
+variables we log-transform.
 
 [^2]: Remember the domain of the logarithmic function is $(0, \infty)$.
 
@@ -159,12 +171,12 @@ centered distribution with which we may better apply
 the posterior analysis.
 
 ```{r, fig.dim = c(8, 4)}
-data_trf <- data
-data_trf$Pregnancies <- log(data_trf$Pregnancies + 1)
-histogram_by_groups(data_trf, "Pregnancies", "log(Pregnancies + 1)")
+data$LogPregnancies <- log(data$Pregnancies + 1)
+histogram_by_groups(data, "LogPregnancies")
 ```
 
 The next variable to visualize is the glucose.
+People with diabetes exhibit higher glucose values.
 The p-value  is very small which
 indicates a highly significant difference between the two groups.
 We also observe that the distribution is already
@@ -180,6 +192,8 @@ In this case, although the distributions appear
 as normal, there does not seem to exist a highly significant
 difference between the groups in contrast to what the p-value states,
 more so compared with the glucose variable.
+Nonetheless, there seem to be an slight indication
+of higher blood pressure for people with diabetes.
 
 ```{r, fig.dim = c(8, 4)}
 histogram_by_groups(data, "BloodPressure")
@@ -190,6 +204,8 @@ are visually to those of the blood pressure but the presence
 of outliers is appreciable.
 We will later deal with those but for now let us
 mantain this variable as it is.
+Note that the population with diabetes appear
+to exhibit a thicker skin.
 
 ```{r, fig.dim = c(8, 4)}
 histogram_by_groups(data, "SkinThickness")
@@ -197,6 +213,9 @@ histogram_by_groups(data, "SkinThickness")
 
 Insulin, as we may have expected from the name of the property
 itself, appears to be a relevant.
+The median of the distributions does indeed seem to differ,
+with the one for the diabetes population being
+slightly higher.
 It is also right-skewed, so we decide to log-transform it.
 
 ```{r, fig.dim = c(8, 4)}
@@ -210,12 +229,14 @@ We will later see if outlier detection get to
 target those values or not.
 
 ```{r, fig.dim = c(8, 4)}
-data_trf$Insulin <- log(data_trf$Insulin)
-histogram_by_groups(data_trf, "Insulin", "log(Insulin)")
+data$LogInsulin <- log(data$Insulin + 1)
+histogram_by_groups(data, "LogInsulin")
 ```
 
 Body Mass Index (BMI) again exhibits this tendency of
 leaning towards a more right-skewed distribution.
+It does also follow the tendency of being
+slightly higher for people with diabetes.
 As such we log-transform to try and get a more normalized variable.
 
 ```{r, fig.dim = c(8, 4)}
@@ -229,13 +250,15 @@ There is some presence of seemingly outlying points
 to the right.
 
 ```{r, fig.dim = c(8, 4)}
-data_trf$BMI <- log(data_trf$BMI)
-histogram_by_groups(data_trf, "BMI", "log(BMI)")
+data$LogBMI <- log(data$BMI + 1)
+histogram_by_groups(data, "LogBMI")
 ```
 
 The Diabetes Pedigree Function (DPF) is the
-most flagrant right-skewed of those which we have
-seen so far.
+again a flagrant right-skewed.
+It again has higher values for the positive set.
+This is to be expected from the definition of this
+very function as a risk indication for diabetes.
 Let us try to log-transform it.
 
 ```{r, fig.dim = c(8, 4)}
@@ -246,15 +269,16 @@ The improvement is highly noticeable.
 We retain thus this transformed variable.
 
 ```{r, fig.dim = c(8, 4)}
-data_trf$DPF <- log(data_trf$DiabetesPedigreeFunction)
-histogram_by_groups(data_trf, "DPF", "log(DPF)")
+data$LogDPF <- log(data$DiabetesPedigreeFunction + 1)
+histogram_by_groups(data, "LogDPF")
 ```
 
+We may note that young people, as with other illnesses
+have less tendency to suffer diabetes than the elders.
 The age is expected to exhibit a right-skewed
-distribution.
-We confirm that this is indeed the case.
-As such we once again use logarithms to transform
-the variable.
+distribution, as is indeed the case.
+In an attempt to improve the symmetry,
+we once again use logarithms to transform the variable.
 
 ```{r, fig.dim = c(8, 4)}
 histogram_by_groups(data, "Age")
@@ -263,10 +287,177 @@ histogram_by_groups(data, "Age")
 The transformation does help although
 not by much.
 This is a common problem of the age variable.
-We will keep the transformation anyways and
-assume normality for the rest of the project.
+We keep the transformation anyway as it does seem
+to help with the symmetry for the positive group.
 
 ```{r, fig.dim = c(8, 4)}
-data_trf$Age <- log(data_trf$Age)
-histogram_by_groups(data_trf, "Age", "log(Age)")
+data$LogAge <- log(data$Age + 1)
+histogram_by_groups(data, "LogAge")
 ```
+
+```{r}
+# Some convenience
+df  <- subset(data, select = -c(Pregnancies, Insulin, BMI, DiabetesPedigreeFunction, Age))
+df0     <-  df[df$Outcome == "Negative", ]
+df1     <-  df[df$Outcome == "Positive", ]
+xnames  <- names(df)[! names(df) %in% c("Outcome")]
+```
+
+Now, let's take a look at some multivariate plots. We'll begin by inspecting the Parallel Coordinate Plot:
+
+```{r, fig.dim = c(8, 4)}
+par(las = 2)
+parcoord(df[xnames], col = c("pink2", "deeppink4"))
+legend("topright", legend = c("Negative", "Positive"),
+       col = c("pink2", "deeppink4"), lty = 1, lwd = 2)
+```
+
+It seems that, overall, the positive lines are 
+over negative ones. 
+This is most notable on the Glucose and log
+transformed BMI.
+They are two of the most significant
+features according to the p-value.
+
+The Andrew's plot is the following: 
+
+```{r, fig.dim = c(8, 4)}
+andrewsplot(as.matrix(df[xnames]), df$Outcome, style = "cart")
+legend("topright", legend = c("Negative", "Positive"),
+       col = c("black", "red"), lty = 1, lwd = 2)
+```
+
+Again, we see that the two groups are different.
+The group of people who have diabetes tend to have more volatile curves,
+reaching higher and lower values along the curve.
+
+## Multivariate characteristics and outlier identification
+
+We are goig to use a multivariate approach
+to identifying the outliers in our data.
+In the process, we will need to compute the
+mean and covariance.
+
+We start then by finding the mean vector and the
+covariance matrix.
+In order to reduce the sensitivity to outliers in this
+computation, we use a robust estimation using 
+the "Fast MCD" (Minimum Covariance Determinant) estimator.
+We set main parameter, `alpha`, which determines the percentage
+of the data to use, at $0.85$.
+
+<!-- TODO: refactor the prints -->
+
+```{r, fig.size = c(8,8)}
+our_corrplot <- function(cov_mat) {
+    colnames(cov_mat) <- c("Log\nPregnancies",
+                           "Glucose",
+                           "Blood\nPressure",
+                           "Skin\nThickness",
+                           "LogInsulin",
+                           "LogBMI",
+                           "LogDPF",
+                           "LogAge")
+    corrplot.mixed(cov2cor(cov_mat), lower = "number", upper = "color",
+        diag = "n", tl.col = "black", tl.cex = 0.65,
+        lower.col = "black")
+}
+
+mcd_est <- CovMcd(df[xnames], alpha = 0.85, nsamp = "deterministic")
+
+print("The mean vector is:")
+print(mcd_est$center)
+print("The covariance matrix is:")
+print(mcd_est$cov)
+
+our_corrplot(mcd_est$cov)
+```
+
+It is interesting to seggregate by the class
+of the Outcome variable.
+This way, we can both, get the mean vector and covariance
+matrix for each of the classes, and the outliers for both sets.
+
+```{r, fig.size = c(8,8)}
+mcd_neg <- CovMcd(df0[xnames], alpha = 0.85, nsamp = "deterministic")
+mcd_pos <- CovMcd(df1[xnames], alpha = 0.85, nsamp = "deterministic")
+
+print("### Negative class ###")
+print("The mean vector is:")
+print(mcd_neg$center)
+print("The covariance matrix is:")
+print(mcd_neg$cov)
+
+our_corrplot(mcd_neg$cov)
+
+print("### Positive class ###")
+print("The mean vector is:")
+print(mcd_pos$center)
+print("The covariance matrix is:")
+print(mcd_pos$cov)
+
+our_corrplot(mcd_pos$cov)
+```
+
+Le us focus first on the mean vectors.
+The here observed particularities are nothing new,
+as they were already present on above histograms:
+
+- Higher number of pregnancies seems to increase
+the chances on developing diabetes.
+
+- The glucose and insulin levels of the positive
+population is higher in contrast to the negative one.
+
+Looking now at the representations for the covariance matrices,
+the major changes are that the correlation between skin thickness and 
+diabetes pedigree function is lower in the group who do not have diabetes
+than in the one having the disease.
+Moreover, the correlation between BMI [^3] and age is positive 
+for the sane group while negative on the positive one.
+
+[^3]: Remember this is the logarithm.
+
+<!-- Perhaps change 0.975 to 0.99 so
+it is less strict -->
+
+We now search for outliers.
+The idea is to use Mahalanobis distance.
+As we suppose that our data $X ~ \mathcal{N}(\mu, \Sigma)$,
+we have $D_M(x,\mu)^2 \sim \chi_p^2$, with $D_M$ the
+Mahalanobis distance.
+Hence we may set our outlier criteria as
+\begin{equation}
+    D_M(x, \mu)^2 > \chi_{p, 0.975^{1/n}}^2 \;,
+\end{equation}
+the $0.975^\text{th}$ quantile of the $\chi_p^2$ distribution.
+We then drop these outliers.
+
+```{r}
+p   <- length(xnames)
+n0  <- nrow(df0)
+n1  <- nrow(df1)
+df0_clean <- df0[mcd_neg$mah^2 < qchisq(0.975^(1 / n0), p), ]
+df1_clean <- df1[mcd_pos$mah^2 < qchisq(0.975^(1 / n1), p), ]
+df_clean  <- rbind(df0_clean, df1_clean)
+
+print(paste("The negative set contained", n0 - nrow(df0_clean), "outliers."))
+print(paste("The positive set contained", n1 - nrow(df1_clean), "outliers."))
+```
+
+As a final summary of this section, we
+perform a plot in which the histograms of different populations
+are observed, as well as scatterplots of pairs of variables
+and correlations.
+
+```{r, fig.dim=c(16,16)}
+ggpairs(df_clean, aes(color = Outcome), legend = 1,
+        columns = xnames,
+        diag = list(continuous = "barDiag")
+        ) +
+    theme(legend.position = "bottom") +
+    scale_fill_manual(values = c("pink", "deeppink4")) +
+    scale_color_manual(values = c("pink", "deeppink4")) + labs(fill = "Outcome")
+```
+
+<!-- TODO: PCA -->
