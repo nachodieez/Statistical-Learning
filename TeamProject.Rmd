@@ -576,17 +576,26 @@ Next, we make the predictions and check the number of instances classified in gr
 lr_test <- predict(lr_train,newdata=as.data.frame(X_test))
 summary(lr_test)
 ```
+It may be interesting to see the confusion matrix and the TER (Test Error Rate). The confussion matrix is:
 
-```{r}
+```{r, echo=FALSE}
 table <- data.frame("Classified_as_negative" = c("True negative (TN)", "False negative (FN)"),
                     "Classified_as_positive" = c("False positive (FP)", "True positive (TP)"))
 rownames(table) <- c("Instances_actually_negative", "Instances_actually_positive")
 
 kable(table) %>% kable_styling(latex_options = "striped")
 ```
+With that in mind, we can define:
+- $TPR=TP/(TP+FN)$ (True Positive Rate i.e. Sensitivity)
+- $FNR=FN/(TP+FN)$ (False Negative Rate)
+- $FPR=FP/(FP+TN)$ (False Positive Rate)
+- $TNR=TN/(FP+TN)$ (True Negative Rate i.e Specificity)
+- $\text{Accuracy}=(TP+TN)/(TP+TN+FP+FN)$
+- $BAC=(TPR+TNR)/2$
 
-
-It may be interesting to see the confusion matrix and the TER (Test Error Rate), which is no more than 1 - Accuracy. In other words, the percentage of missclassified individuals. First we compute the confussion matrix:
+The TER is no more than $1 - \text{Accuracy}$. In other words, the percentage of missclassified individuals.
+ 
+We compute the confussion matrix:
 ```{r}
 cm_lg_default <- table(Y_test,lr_test)
 cm_lg_default
@@ -636,13 +645,13 @@ abline(h=0.5)
 
 We are not happy with the performance of the model so we are going to try to improve it.
 
-First, we are going to do stepwise model selection. 
+In order to try to solve it, we are going to first do stepwise model selection. 
 The information criterion that we are going to use in order to evaluate the measure the performance of the model is the *Bayesian Information Criterion* (BIC), and it is defined as
 
 $$
 BIC = -2l(model)+npar(model)\cdot\log(n)
 $$
-and it aims to balance the model complexity and fitness.
+and it aims to balance the model complexity and fitness. We do the stepwide model selection:
 
 ```{r}
 ### BIC
@@ -677,56 +686,58 @@ BAC <- bac(cm)
 BAC
 ```
 
+As the logistic regression is a scoring classifier (i.e. a classifier that predicts a real value representing the probability that the instance belongs to a certain class, in our case, to be positive in diabetes) we can choose the threshold we can define the threshold at which we decide that the instance is considered to be positive for diabetes. Until now, we have been using $0.5$ as the threshold.
 
+We define a function that takes the model, the data and a given threshold and returns the prediction given that threshold.
 
 ```{r}
-get_logistic_pred = function(mod, data, res = "y", pos = "Positive", neg = "Negative", cut = 0.5) {
-  probs = predict(mod, newdata = data, type = "response")
-  ifelse(probs > cut, pos, neg)
+get_logistic_pred = function(model, data, threshold = 0.5) {
+  probs = predict(model,newdata=data,type="response")
+  ifelse(probs > threshold, "Positive", "Negative")
 }
-
-X_test_2 <- as.data.frame(X_test[, names(model_glm$coefficients)[-1]])
-
-test_pred_10 = get_logistic_pred(model_glm, data = X_test_2, res = "default", 
-                                 cut = 0.1)
-test_pred_50 = get_logistic_pred(model_glm, data = X_test_2, res = "default", 
-                                 cut = 0.5)
-test_pred_90 = get_logistic_pred(model_glm, data = X_test_2, res = "default", 
-                                 cut = 0.9)
 ```
 
+Thus, we can compute the the new predictions for different cuts ($0.1$, $0.5$ and $0.9$) by:
 ```{r}
-test_tab_10 = table(predicted = test_pred_10, actual = Y_test)
-test_tab_50 = table(predicted = test_pred_50, actual = Y_test)
-test_tab_90 = table(predicted = test_pred_90, actual = Y_test)
+test_pred_10_lg = get_logistic_pred(model_glm, data = X_test_2,
+                                 threshold = 0.1)
+test_pred_50_lg = get_logistic_pred(model_glm, data = X_test_2, 
+                                 threshold = 0.5)
+test_pred_90_lg = get_logistic_pred(model_glm, data = X_test_2,
+                                 threshold = 0.9)
+```
+For these thresholds, we now can compute they accuracy, sensitivity and specificity:
+```{r}
+test_tab_10_lg = table(predicted = test_pred_10_lg, actual = Y_test)
+test_tab_50_lg = table(predicted = test_pred_50_lg, actual = Y_test)
+test_tab_90_lg = table(predicted = test_pred_90_lg, actual = Y_test)
 
-test_con_mat_10 = confusionMatrix(test_tab_10, positive = "Positive")
-test_con_mat_50 = confusionMatrix(test_tab_50, positive = "Positive")
-test_con_mat_90 = confusionMatrix(test_tab_90, positive = "Positive")
+test_con_mat_10_lg = confusionMatrix(test_tab_10_lg, positive = "Positive")
+test_con_mat_50_lg = confusionMatrix(test_tab_50_lg, positive = "Positive")
+test_con_mat_90_lg = confusionMatrix(test_tab_90_lg, positive = "Positive")
 
 metrics = rbind(
   
-  c(test_con_mat_10$overall["Accuracy"], 
-    test_con_mat_10$byClass["Sensitivity"], 
-    test_con_mat_10$byClass["Specificity"]),
+  c(test_con_mat_10_lg$overall["Accuracy"], 
+    test_con_mat_10_lg$byClass["Sensitivity"], 
+    test_con_mat_10_lg$byClass["Specificity"]),
   
-  c(test_con_mat_50$overall["Accuracy"], 
-    test_con_mat_50$byClass["Sensitivity"], 
-    test_con_mat_50$byClass["Specificity"]),
+  c(test_con_mat_50_lg$overall["Accuracy"], 
+    test_con_mat_50_lg$byClass["Sensitivity"], 
+    test_con_mat_50_lg$byClass["Specificity"]),
   
-  c(test_con_mat_90$overall["Accuracy"], 
-    test_con_mat_90$byClass["Sensitivity"], 
-    test_con_mat_90$byClass["Specificity"])
+  c(test_con_mat_90_lg$overall["Accuracy"], 
+    test_con_mat_90_lg$byClass["Sensitivity"], 
+    test_con_mat_90_lg$byClass["Specificity"])
   
 )
-```
-
-```{r}
 rownames(metrics) = c("c = 0.10", "c = 0.50", "c = 0.90")
 colnames(metrics) = c("Accuracy", "Sensitivity", "Specificity")
 
-metrics
-
+metrics %>% kable() %>% kable_styling(latex_options = "striped")
+```
+As can be seen, with the threshold=$0.1$ we obtain a high sensitivity but a low specificity and, for the threshold=$0.9$ a low sensitivity but a low specificity. We can plot a ROC curve to search for the best threshold.
+```{r}
 test_prob = predict(model_glm, newdata = X_test_2, type = "response")
 
 ROC = plot.roc(Y_test, test_prob,
@@ -735,17 +746,37 @@ ROC = plot.roc(Y_test, test_prob,
          thresholds="best", # select the (best) threshold
          print.thres="best",
          print.auc=TRUE) # also highlight this threshold on the plot
+```
+It is around $0.4$
+```{r}
 ROC
 ```
+
+If we compute the predictions with the new threshold:
 
 ```{r}
 pred <- predict(model_glm, X_test_2, type = "response") > 
   as.numeric(rownames(ROC$ci$specificity))
 pred <- pred * 1
+pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm <- table(Y_test, pred)
+cm
+```
 
+We can see a much better confussion matrix, and, if we compute de BAC:
+
+```{r}
 BAC <- bac(cm)
 BAC
+```
+It is much better now.
+
+```{r}
+colors_errors <- c(color_4,color_3)[1*(Y_test==pred)+1]
+plot(1:n_test,prob_lr_test,col=colors_errors,pch=20,type="p",
+     xlab="Test sample",ylab="Probabilities of Non-Diabetes",
+     main="Probabilities of Non-Diabetes")
+abline(h=as.numeric(rownames(ROC$ci$specificity)))
 ```
 
 
