@@ -27,6 +27,7 @@ require(nnet)
 require(naivebayes)
 require(pROC)
 require(caret)
+require(kableExtra)
 ```
 
 <!-- TODO: Introduction -->
@@ -575,6 +576,16 @@ Next, we make the predictions and check the number of instances classified in gr
 lr_test <- predict(lr_train,newdata=as.data.frame(X_test))
 summary(lr_test)
 ```
+
+```{r}
+table <- data.frame("Classified_as_negative" = c("True negative (TN)", "False negative (FN)"),
+                    "Classified_as_positive" = c("False positive (FP)", "True positive (TP)"))
+rownames(table) <- c("Instances_actually_negative", "Instances_actually_positive")
+
+kable(table) %>% kable_styling(latex_options = "striped")
+```
+
+
 It may be interesting to see the confusion matrix and the TER (Test Error Rate), which is no more than 1 - Accuracy. In other words, the percentage of missclassified individuals. First we compute the confussion matrix:
 ```{r}
 cm_lg_default <- table(Y_test,lr_test)
@@ -646,7 +657,9 @@ model_glm <- MASS::stepAIC(mod_zero, scope = list(lower = mod_zero, upper = mod_
 model_glm$coefficients
 ```
 
-We can see that the variables selected by the model are the same as the four more significant variables selected by the t-test
+We can see that the variables selected by the model are the same as the four more significant variables selected by the t-test. 
+
+By predicting with the new model we obtain very similar results as the previous ones:
 
 ```{r}
 X_test_2 <- X_test[, names(model_glm$coefficients)[-1]]
@@ -657,14 +670,16 @@ cm <- table(Y_test, pred)
 cm
 ```
 
+And almost the same BAC:
 
 ```{r}
 BAC <- bac(cm)
 BAC
 ```
 
+
+
 ```{r}
-##### voy a hacer una ROC
 get_logistic_pred = function(mod, data, res = "y", pos = "Positive", neg = "Negative", cut = 0.5) {
   probs = predict(mod, newdata = data, type = "response")
   ifelse(probs > cut, pos, neg)
