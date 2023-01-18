@@ -493,11 +493,13 @@ color_3 <- "seagreen2"
 color_4 <- "indianred2"
 ```
 
-
+We split the data into the predictors ($X$) and the variable we want to predict ($Y$):
 ```{r}
 X <- df_clean[,xnames]
 Y <- df_clean$Outcome
 ```
+
+
 
 ```{r}
 n <- nrow(X)
@@ -516,6 +518,9 @@ pr_no <- n_no/n
 pr_yes <- n_yes/n
 c(pr_no,pr_yes)
 ```
+To create the training and test partitions we will make a 70/30 partition, that is, 70% of the individuals will go to the training partition and the remaining 30% to the test partition.
+
+In order to do that, first we are going to compute the number of individuals of each partition:
 
 ```{r}
 n_train <- floor(.7*n) ## 70/30 partition for train and test
@@ -523,74 +528,84 @@ n_test <- n - n_train
 c(n_train,n_test)
 ```
 
+With that computed, we can generate the index of the individuals that are going to belong to the training partition:
 ```{r}
 i_train <- sort(sample(1:n,n_train))
+```
+The individuals that are going to belong to the testing partition will be the ones that do not belong to the training partition, thus we can generate the training and testing partitions by:
 
+```{r}
 X_train <- X[i_train,]
 X_test <- X[-i_train,]
 Y_train <- Y[i_train]
 Y_test <- Y[-i_train]
 ```
 
+
 ```{r}
-sum(Y_train=="Negative")/n_train
-sum(Y_train=="Positive")/n_train
-sum(Y_test=="Negative")/n_test
-sum(Y_test=="Positive")/n_test
+np_train <- sum(Y_train=="Negative")/n_train
+pp_train <- sum(Y_train=="Positive")/n_train
+cat(paste0())
 ```
 
 ```{r}
-
+np_test <- sum(Y_test=="Negative")/n_test
+pp_train <- sum(Y_test=="Positive")/n_test
 ```
-
 
 
 ## Logistic Regression
 
-
-
+The first model we are going to test is logistic regression. We start by training the model and checking the summary:
 ```{r}
 lr_train <- multinom(Y_train~.,data=X_train)
-# Have a look at the estimated coefficients and their standard errors
 summary(lr_train)
 ```
 
+In order to see which are the most significant coefficients, we can use the t-test:
+
 ```{r}
-# To see which are the most significant coefficients, we use the t-test that is computed next
-
 t_test_lr_train <- summary(lr_train)$coefficients/summary(lr_train)$standard.errors
-
-# Sort the absolute value of the t-test in decreasing order
-
 sort(abs(t_test_lr_train),decreasing=TRUE)
 ```
+We can see that the most important variables are *Glucose*, *LogBMI*, *LogDPF* and *LogAge*.
 
+Next, we make the predictions and check the number of instances classified in group:
 ```{r}
 lr_test <- predict(lr_train,newdata=as.data.frame(X_test))
-head(lr_test)
-```
-
-
-```{r}
-# Number of instances classified in each group
-
 summary(lr_test)
 ```
-
-
+It may be interesting to see the confusion matrix and the TER (Test Error Rate), which is no more than 1 - Accuracy. In other words, the percentage of missclassified individuals. First we compute the confussion matrix:
 ```{r}
-# Table with good and bad classifications
-
-table(Y_test,lr_test)
+cm_lg_default <- table(Y_test,lr_test)
+cm_lg_default
 ```
+It can be observed that the model classifies well those individuals who do not have diabetes, but has a hard time classifying those individuals who have diabetes, probably because the dataset is not balanced.
 
+Now, we compute both the TER and the accuracy:
 
 ```{r}
-# Obtain the Test Error Rate (TER)
-
 lr_TER <- mean(Y_test!=lr_test)
 lr_TER
+lr_ACC <- 1 - lr_TER
+lr_ACC
 ```
+The value obtained is not bad, but we must keep in mind that the classifier is doing really bad in classifying diabetic individuals. This can be seen more clearly if we calculate the Balanced Accuracy (BAC).
+
+First we define a function to compute the BAC given a confussion matrix:
+
+```{r}
+bac <- function(cm){
+  return(((cm[1,1]/(cm[1,1] + cm[1,2])) + (cm[2,2]/(cm[2,1] + cm[2,2])))/2)
+}
+```
+
+Thus, we can compute the BAC by using it:
+```{r}
+bac(cm_lg_default)
+```
+
+It is observed that the value obtained is noticeably worse than the accuracy.
 
 ```{r}
 # Obtain the probabilities of non-diabetes
@@ -603,17 +618,20 @@ head(prob_lr_test)
 
 colors_errors <- c(color_4,color_3)[1*(Y_test==lr_test)+1]
 plot(1:n_test,prob_lr_test,col=colors_errors,pch=20,type="p",
-     xlab="Test sample",ylab="Probabilities of Diabetes",
+     xlab="Test sample",ylab="Probabilities of Non-Diabetes",
      main="Probabilities of Diabetes")
 abline(h=0.5)
 ```
 
-```{r}
-bac <- function(cm){
-  return(((cm[1,1]/(cm[1,1] + cm[1,2])) + (cm[2,2]/(cm[2,1] + cm[2,2])))/2)
-}
-```
+We are not happy with the performance of the model so we are going to try to improve it.
 
+First, we are going to do stepwise model selection. 
+The information criterion that we are going to use in order to evaluate the measure the performance of the model is the *Bayesian Information Criterion* (BIC), and it is defined as
+
+$$
+BIC = -2l(model)+npar(model)\cdot\log(n)
+$$
+and it aims to balance the model complexity and fitness.
 
 ```{r}
 ### BIC
@@ -621,13 +639,26 @@ final_df <- as.data.frame(cbind(X_train, Y_train))
 final_df$Y_train <- ifelse(final_df$Y_train=="Negative", 0, 1)
 mod_zero  <- glm(Y_train ~ 1, family = binomial, data = final_df)
 mod_all   <- glm(Y_train ~ ., family = binomial, data = final_df)
-model_glm <- MASS::stepAIC(mod_zero, scope = list(lower = mod_zero, upper = mod_all),
-                      direction = "both", trace = 0, k = log(nrow(final_df)))
+model_glm <- MASS::stepAIC(mod_zero, scope = list(lower = mod_zero, upper = mod_all), direction = "both", trace = 0, k = log(nrow(final_df)))
+```
+
+```{r}
+model_glm$coefficients
+```
+
+We can see that the variables selected by the model are the same as the four more significant variables selected by the t-test
+
+```{r}
 X_test_2 <- X_test[, names(model_glm$coefficients)[-1]]
-pred <- predict(model_glm, X_test_2) > 0.1
+
+pred <- predict(model_glm, X_test_2, type="response") > 0.5
 pred <- c("Negative", "Positive")[(1*pred)+1]
 cm <- table(Y_test, pred)
+cm
+```
 
+
+```{r}
 BAC <- bac(cm)
 BAC
 ```
