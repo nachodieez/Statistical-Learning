@@ -29,6 +29,7 @@ require(RSpectra)
 require(factoextra)
 require(knitr)
 require(kableExtra)
+require(ica)
 ```
 
 <!-- TODO: Introduction -->
@@ -111,7 +112,7 @@ pred_mat[,9] <- 0
 for (i in 1:8){
   pred_mat[i,i]<-0
 }
-data_im <- mice(data, m = 1, method = "pmm", )
+data_im <- mice(data, m = 1, method = "pmm", predictorMatrix = pred_mat)
 data    <- complete(data_im)
 ```
 
@@ -322,7 +323,7 @@ Now, let's take a look at some multivariate plots. We'll begin by inspecting the
 
 ```{r, fig.dim = c(8, 4)}
 par(las = 2)
-parcoord(df[xnames], col = c("pink2", "deeppink4"))
+parcoord(df[xnames], col = c("skyblue", "deeppink4"))
 legend("topright", legend = c("Negative", "Positive"),
        col = c("pink2", "deeppink4"), lty = 1, lwd = 2)
 ```
@@ -486,6 +487,371 @@ ggpairs(df_clean, aes(color = Outcome), legend = 1,
     scale_color_manual(values = c("pink", "deeppink4")) + labs(fill = "Outcome")
 ```
 
+# Multivariate analysis and dimensionality reduction
+
+Our data has few variables, which makes dimensionality
+reduction not crucial for the predictive process.
+However, we may still extract important information and
+insight from these techniques.
+
+## Principal Component Analysis
+
+The first of the techniques we will employ is
+Principal Component Analysis (PCA).
+A main assuption when using this technique is the
+normality of the variables.
+We already know that they do not follow a normal distribution,
+but we may approximately suppose they do.
+Before the actual computation is made, we
+must scale our data.
+In order to do so, we perform a univariate
+scaling because our different variables have
+different ranges and units.
+
+```{r}
+df_sc <- as.data.frame(scale(df_clean[, xnames]))
+df_sc$Outcome <- df_clean$Outcome
+```
+
+```{r, fig.dim=c(8, 4)}
+df_pcs <- prcomp(df_sc[, xnames])
+
+df_two <- as.data.frame(df_pcs$x[, 1:2])
+df_two$group <- df_clean$Outcome
+colnames(df_two) <- c("x", "y", "group")
+
+ggplot(df_two, aes(x = x, y = y, col = group)) +
+    geom_point() +
+    xlab("First PC") + ylab("Second PC") + ggtitle("First two PCs") +
+    scale_colour_manual(values = c("pink", "deeppink4")) +
+    theme_bw() + labs(col = "Group")
+```
+
+Here we see something important.
+The first principal component (PC) does a reasonably
+good job at seggregating both groups.
+However, it performs better in clustering the negative population
+than the positive one.
+On the other hand, the second PC appears to be agnostic
+of the objective value.
+This implies that variables whose variance is mainly explained
+by the first PC are going to play a more crucial role
+in distinguishing both groups.
+
+With respect to the last point, it is of usefulness
+to examine how the different variables contribute to
+these two principal components.
+We will do so in two steps.
+First, we look infividually at the two PCs with a loading plot.
+Then, we will draw a biplot.
+
+Starting with the first PC, we note that all the variables
+contribute positively and around the same amount save
+from the LogDPF which lags behind.
+
+```{r, fig.size = c(8, 4)}
+df_temp <- data.frame(x = seq_along(xnames), y = df_pcs$rotation[, 1])
+
+ggplot(df_temp, aes(x = x, y = y)) +
+    geom_point() +
+    geom_label(label = xnames, label.size = 0.3) +
+    xlab("Variables") + ylab("Loadings") + ggtitle("First PC") +
+    theme_bw() + xlim(c(-2, 10)) + ylim(-0.01, 0.5) +
+    scale_x_continuous(breaks = c((-2):10)) +
+    geom_hline(yintercept = 0)
+```
+
+The loadings of the second PC tell another story.
+Here we see that LogPregnancies and LogAge have a negative loading
+while SkinThickness and LogBMI have a positive one.
+The rest on the other hand seem to not have a significant contribution.
+Nonetheless, as before stated, this PCA seems unable to effectively
+seggregate the data into the two outcome groups.
+
+```{r, fig.size = c(8, 4)}
+df_temp <- data.frame(x = seq_along(xnames), y = df_pcs$rotation[, 2])
+
+ggplot(df_temp, aes(x = x, y = y)) +
+    geom_point() +
+    geom_label(label = xnames, label.size = 0.3) +
+    xlab("Variables") + ylab("Loadings") + ggtitle("Second PC") +
+    theme_bw() + xlim(c(-2, 10)) + ylim(-0.5, 0.8) +
+    scale_x_continuous(breaks = c((-2):10)) +
+    geom_hline(yintercept = 0)
+```
+
+A nice and visual summary is obtained with a biplot.
+Here we may extract two main conclusions.
+The first is that the variables are divided into three
+clear groups somewhat uncorrelated with high correlations inside them.
+A special note is that LogDPF seems to not follow the general tendency,
+something that was already hinted in the loadings plots.
+We will later try to see the origin of this discrepancy.
+The second conclusion is that given the first PCA is able to
+properly seggregate the outcomes and that, save for LogDPF,
+all variables contribute on a similar ammount to the first PCA,
+it appear that all variables will play an important role and we
+cannot drop them from the posterior analysis [^4].
+
+[^4]: At least using this approach. Some later methods will carry
+different dimensionality reduction techniques which may or may not
+discard some variables.
+
+```{r, fig.size = c(8, 8)}
+biplot(df_pcs, cex = c(0.5, 0.8))
+```
+
+Looking into the variace explained by each PC, we see
+that the first two, on which we have based
+our previous analysis, retain around two thirds
+of the total variance.
+This diagram is also useful to determine which number of
+PCAs should we keep if we were to perform actual
+dimensionality reduction.
+For this case, there is not a strongly clear knee point
+on which to claim optimality.
+Based on the graph, we would place it somewhere
+between 3 and 5 PCAs.
+Let us for the following consider 4, equivalent
+to setting a threshold at $10\%$ of explained variance.
+
+```{r, fig.size = c(8, 4)}
+fviz_eig(df_pcs, ncp = 17, addlabels = TRUE, barfill = "pink", barcolor = "deeppink4")
+```
+
+Looking at the scatterplots
+we once again observe that the best seggregating
+component is the first, clearly outperforming
+the rest of the PCAs by a wide margin, which prove
+themselves kind of agnostic to the objective variable.
+This agnosticity even seems to increment as the variance
+explained decreases, i.e. higher PCs.
+
+```{r, fig.size = c(16, 16)}
+pairs(df_pcs$x[, 1:4], col = vec_col)
+```
+
+Looking at the correlations we kind of observe
+the same we have been observing since the loadings,
+big positive correlations from almost all the variables
+with the first PCA.
+However, we can now see to which PC does the LogDPF contribute.
+We see it accounts for the vast majority of the fourth PC.
+Regarding the third PC, we see noticeable negative correlations
+with Glucose and LogInsulin, but nothing significant appart from that.
+
+```{r, fig.size = c(8, 8)}
+corrplot(cor(df_clean[, xnames], df_pcs$x[, 1:4]), is.corr = TRUE)
+```
+
+## Independent Component Analysis
+
+Let us now make use of the independent component analysis (ICA) to extract
+more information.
+If we plot all of them, we note that some do not follow a normal distribution
+but are instead right-skewed.
+This happens for the fifth to eighth independent components (ICs).
+The second one does also diverge from normality but in a left-skewed manner.
+
+```{r, results = FALSE, fig.size = c(12, 12)}
+df_trans_ica <- icafast(df_clean[, xnames], nc = length(xnames), alg = "par")
+z <- df_trans_ica$S
+colnames(z) <- sprintf("IC-%d", seq(8))
+n <- nrow(df)
+z <- z * sqrt((n - 1) / n)
+
+par(mfrow = c(3, 3))
+sapply(colnames(z),
+    function(cname) {
+        hist(as.data.frame(z)[[cname]],
+             main = cname, col = "deeppink4", xlab = "")
+    })
+```
+
+We now look at the negative entropy of them and note that two of
+the ICs, the third and the eighth have a much higher negative entropy
+than the rest.
+As such, we now want to see if they are good candidates for seggregating
+our data into the two outcome groups.
+
+```{r, fig.size = c(8, 4)}
+neg_entropy <- function(z) {
+    mean(z^3)^2 / 12 + mean(z^4)^2 / 48
+}
+
+z_neg_entropy <- apply(z, 2, neg_entropy)
+ic_sort  <- sort(z_neg_entropy, decreasing = TRUE, index.return = TRUE)$ix
+z_ic_imp <- z[, ic_sort]
+
+par(mfrow = c(1, 1))
+plot(z_neg_entropy[ic_sort], type = "b", col = "pink", pch = 19,
+     ylab = "Neg-entropy", main = "Neg-entropies",
+     lwd = 3, xaxt = "n"
+     )
+axis(side = 1, at = 1:8, labels = ic_sort, las = 1)
+```
+
+Unfortunately, they are not able to seggregate the groups,
+but we may use this plot to identify certain may-be outliers
+which lie in the negative dispersion of the eighth IC.
+An appropiate condition to select them could be
+\begin{equation}
+    \text{IC}-8 < -2.5 \;.
+\end{equation}
+
+```{r, fig.size = c(8, 4)}
+df_temp <- data.frame(x = z_ic_imp[, 1], y = z_ic_imp[, 2], group = df_clean$Outcome)
+ggplot(df_temp, aes(x = x, y = y, col = group)) + geom_point() +
+    xlab("Third IC") + ylab("Eighth IC") +
+    ggtitle("ICs with more neg-entropy") +
+    scale_colour_manual(values = c("pink", "deeppink4")) +
+    theme_bw() + labs(col = "Group")
+```
+
+Following the same workflow we used for PCA, we now
+represent an scatterplot of all of the ICs to look
+for useful ICs which may be able to help in a
+clusterization of our data based on having or not diabetes.
+
+For our case, there was not a pair of ICs which was able to
+separate the two groups in a significant way.
+As such, we belive we will not get much more information
+using this approach.
+Nonetheless, by visualizing the covarariances of the
+ICs with respect to the original variables, we note that
+each of the ICs is highly correlated to at most two attributes.
+A conclusion we may extract is that there are no simple combination
+of of attributes which may seggregate impactfully the outcome [^5].
+
+[^5]: This is slightly redundant information, as from the attribute
+scatter plot we did already know that there was not any pairplot capable
+of splitting clearly the groups.
+
+```{r, fig.size = c(16, 16)}
+pairs(z_ic_imp, col = vec_col)
+```
+
+```{r, fig.size = c(8, 8)}
+corrplot(cor(df_clean[, xnames], z_ic_imp), is.corr = TRUE)
+```
+
+<!-- 
+#```{r}
+colnames(df_pcs$x) <- paste0("PC", 1:8)
+corrplot(cor(df_pcs$x, z_ic_imp), lower.col = "black")
+```
+-->
+
+## Factor Analysis
+
+The last of the techniques we are going to employ is the
+factor analysis.
+The motivation lies in the following plot, where we observe
+that some groups of variables are correlated,
+suggesting a factor structure.
+Note that we expect these groups and the findings here to
+be similar to those observed in the previously drawed biplot.
+However, if we may
+reach to the same conclusions from different approaches it will strengthen
+our conclusions on this regard.
+
+```{r, fig.size = c(8, 8)}
+corrplot(cor(df_clean[, xnames]), order = "hclust")
+```
+
+Some mathematical tinkering needs to be done as to extract
+the loadings of the factors.
+We refer to the lecture notes for the details on the operations
+and focus on the thoughts we may extract.
+
+```{r}
+m_0 <- df_pcs$rotation[, 1:3] %*% diag(df_pcs$sdev[1:3])
+s_y <- cov(df_sc[, xnames])
+mm  <- s_y - diag(diag(s_y - m_0 %*% t(m_0)))
+mm_eig <- eigen(mm)
+m_1 <- mm_eig$vectors[, 1:3] %*% sqrt(diag(mm_eig$values[1:3]))
+
+m_vrm <- loadings(varimax(m_1))[seq_along(xnames), 1:3]
+```
+
+On the following we attach the loadings for the first
+three factors.
+Let us look at them and the insight they might provide.
+
+The two main attributes which contribute to the first
+factor are LogBMI and the skin thickness.
+These do correspond to what we observed in the biplot.
+Note that we are not medical experts, but we may suppose
+that this relation comes from the fact that skin thickness
+is usually related with high presence of fat, which increases
+the value of the Body Mass Index.
+
+The second factor presents a more challenging scenario
+which we cannot immediately identify with a previous cluster
+in the biplot.
+Unfortunately we lack a medical expertise which could
+identify this kind of plot.
+What we can clearly say is that the second factor is dominated
+by the blood pressure.
+
+As with the second, the third factor does not show a clear
+dominance of any of the attributes over the rest.
+It does provide an interesting observation and is that the
+two variables which lie futher away in this graph are the age
+and the number of pregnancies, which appeared clustered on the PCA.
+
+```{r, fig.size = c(8, 4)}
+plot(seq_along(xnames), m_vrm[, 1], pch = 19,
+    col = "pink", xlim = c(-1, 9), ylim = c(-1.1, 0.1),
+    xlab = "", ylab = "Loadings",
+    main = "Loadings for the first factor")
+abline(h = 0)
+text(seq_along(xnames), m_vrm[, 1], labels = xnames, pos = 1, col = "deeppink4", cex = 0.75)
+```
+
+```{r, fig.size = c(8, 4)}
+plot(seq_along(xnames), m_vrm[, 2], pch = 19,
+    col = "pink", xlim = c(-1, 9), ylim = c(-0.05, 0.4),
+    xlab = "", ylab = "Loadings",
+    main = "Loadings for the second factor")
+abline(h = 0)
+text(seq_along(xnames), m_vrm[, 2], labels = xnames, pos = 1, col = "deeppink4", cex = 0.75)
+```
+
+```{r, fig.size = c(8, 4)}
+plot(seq_along(xnames), m_vrm[, 3], pch = 19,
+    col = "pink", xlim = c(-1, 9), ylim = c(-0.1, 0.3),
+    xlab = "", ylab = "Loadings",
+    main = "Loadings for the third factor")
+abline(h = 0)
+text(seq_along(xnames), m_vrm[, 3], labels = xnames, pos = 1, col = "deeppink4", cex = 0.75)
+```
+
+## Conclusions
+
+This section is comprised of a high number of graphs which
+may lead us away from the insight they bring.
+As such, we here present the conclusions that we were
+able to extract from all the analysis:
+
+- The objective variable does not seem to exhibit
+a clear dependence from one or few of the attributes,
+but of all of them.
+It is worth to mention that the first PC does seem
+able to approximately distinguish clearly negative
+individuals, but fails in the more complicated instances.
+
+- The variables are correlated between them forming
+groups.
+This is, in general, due to medical reasons, which
+unfortunately we are not able to explain in detail.
+Nonetheless, none of the variables appeared redundant.
+
+- Some outliers may be considered to still exist on
+the data.
+However, given they do not seem crucial for the analysis,
+we decide to keep them.
+
 <!-- TODO: PCA -->
 <!-- definitive data: df_clean -->
 <!-- definitive attributes: df_clean[, xnames] -->
@@ -499,16 +865,14 @@ c4 <- "seagreen2"
 c5 <- "orange2"
 c6 <- "firebrick2"
 
-X <- df_clean[,-4]
-y <- df_clean[,4]
-y2 <- dplyr::recode(y, Negative = 0, Positive = 1)
-X2 <- scale(X)
+y2 <- dplyr::recode(df_clean$Outcome, Negative = 0, Positive = 1)
+X2 <- as.matrix(df_sc[, xnames])
 ```
 
 # Unsupervised learning
 
 ```{r, echo = F}
-cluster_means <- function(x, data = X, first = 1){
+cluster_means <- function(x, data = df_clean[,xnames], first = 1){
   if(first == 0){
     x <- x + 1
   }
@@ -558,17 +922,17 @@ gap_stat <- clusGap(X2, FUN = kmeans, K.max = 10, B = 100)
 fviz_gap_stat(gap_stat, linecolor = c1, maxSE = 
                 list(method = "firstSEmax", SE.factor = 1))
 ```
-This also suggests that the optimal number of clusters is 2.
+This suggests that the optimum number for k is 3. However, we can see that all values of k get very similar gap statistics, so we will proceed with k = 2, as it also is the number of classes that our problem has. 
 
 ### K-Means
 
-The results of k-means clustering are the following: 
+The results of k-means clustering with 2 clusters are the following: 
 
 ```{r}
 kmeans_X <- kmeans(X2, centers = 2, iter.max = 1000, nstart = 100)
 
 kmeans_col <- c(c1, c2)[kmeans_X$cluster]
-plot(X2[,1:2], col = kmeans_col, main = "First two PCs", 
+plot(df_two[,1:2], col = kmeans_col, main = "First two PCs", 
      xlab = "First PC", ylab = "Second PC", pch  = 16)
 ```
 
@@ -582,12 +946,13 @@ kable(kmeans_means)
 We can also see the confusion matrix with our target variable, although we must remember that this is not the objective of unsupervised learning.
 
 ```{r}
-kable(cluster_classification(kmeans_X$cluster, first = 1))
+table_kmeans <- cluster_classification(kmeans_X$cluster, first = 1)
+kable(table_kmeans)
 ```
 
-As we can see, the clusters are not exactly coincident with the target variable.
+As we can see, the clusters are not exactly coincident with the target variable, but it does a good job (`r round((table_kmeans[1,1]+table_kmeans[2,2])/757, 2)`% accuracy).
 
-## K-Medoids
+### K-Medoids
 
 As all of our attributes are numerical and we don't have any reason not to, we will use Euclidean distance.
 
@@ -595,11 +960,11 @@ As all of our attributes are numerical and we don't have any reason not to, we w
 pam_X <- pam(X2, k = 2, metric = "euclidean", stand = FALSE)
 pam_col <- c(c1, c2)[pam_X$cluster]
 
-plot(X2[,1:2], col = pam_col, main = "First two PCs", 
+plot(df_two[,1:2], col = pam_col, main = "First two PCs", 
      xlab = "First PC", ylab = "Second PC", pch = 19)
 ```
 
-We obtain a very similar result than with K-Means.
+We obtain a very similar result than with K-Means, although they separation between groups in the first PCs is diagonal, whereas in the K-Means it was vertical. We can take a look into the averages (we do not see the medoids because they were computed with the scaled data):
 
 ```{r}
 pam_means <- cluster_means(pam_X$cluster, first = 1)
@@ -608,7 +973,7 @@ kable(pam_means)
 Again, the confusion matrix is the following:
 
 ```{r}
-cluster_classification(pam_X$cluster)
+kable(cluster_classification(pam_X$cluster))
 ```
 Very similar results than with K-Means.
 
@@ -618,10 +983,10 @@ Very similar results than with K-Means.
 clara_X <- clara(X2, k = 2, metric = "euclidean", stand=FALSE)
 clara_col <- c(c1, c2)[clara_X$cluster]
 
-plot(X2[,1:2], col = clara_col, main = "First two PCs", 
+plot(df_two[,1:2], col = clara_col, main = "First two PCs", 
      xlab = "First PC", ylab = "Second PC", pch = 19)
 ```
-Again, we can observe that the results are very similar than with both K-Means and K-Medoids.
+We can observe that the results are not very similar than with K-Means and K-Medoids. There are `r table(clara_X$cluster)[1]` instances in one group and `r table(clara_X$cluster)[2]` in the other. 
 
 ```{r}
 clara_means <- cluster_means(clara_X$cluster, first = 1)
@@ -635,11 +1000,84 @@ cluster_classification(clara_X$cluster)
 
 ### Single linkage
 
+```{r}
+euc_dist_X <- daisy(X2, metric = "euclidean")
+single_X <- hclust(euc_dist_X, method = "single")
+plot(single_X, main = "Single linkage", cex = 0.8)
+rect.hclust(single_X, k = 2, border = c1)
+```
+
+This does not seem to yield good results. The clusters created are very, very, very small. 
+
+```{r}
+cl_single_X <- cutree(single_X, 2)
+table(cl_single_X, y2)
+```
+Only two one instance belongs to the second cluster.
+
+```{r}
+sil_single_X <- silhouette(cl_single_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_single_X)
+```
+
 ### Complete linkage
+
+```{r}
+complete_X <- hclust(euc_dist_X, method = "complete")
+plot(complete_X, main = "Complete linkage", cex = 0.8)
+rect.hclust(complete_X, k = 2, border = c1)
+```
+
+```{r}
+cl_complete_X <- cutree(complete_X, 2)
+table(cl_complete_X, y2)
+```
+Now, we can see that the sizes of the clusters are much more similar, although one is twice as big as the other. 
+
+```{r}
+sil_complete_X <- silhouette(cl_complete_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_complete_X)
+```
 
 ### Average linkage
 
-### Ward linakge
+```{r}
+average_X <- hclust(euc_dist_X, method = "average")
+plot(average_X, main = "Average linkage", cex = 0.8)
+rect.hclust(average_X, k = 2, border = c1)
+```
+
+As with the single linkage, the clusters created by this method are very small and does not seem adequate in this case. 
+
+```{r}
+cl_average_X <- cutree(average_X, 2)
+table(cl_average_X, y2)
+```
+
+```{r}
+sil_average_X <- silhouette(cl_average_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_average_X)
+```
+
+### Ward linkage
+
+```{r}
+ward_X <- hclust(euc_dist_X, method = "ward.D")
+plot(ward_X, main = "Ward linkage", cex = 0.8)
+rect.hclust(ward_X, k = 2, border = c1)
+```
+
+```{r}
+cl_ward_X <- cutree(ward_X, 2)
+table(cl_ward_X, y2)
+```
+
+The sizes of the clusters are almost identical, and it actually resembles the groups of the target variable (`r round((table(cl_ward_X, y2)[1,1]+table(cl_ward_X, y2)[2,2]) / 757, 2)`% accuracy). 
+
+```{r}
+sil_ward_X <- silhouette(cl_ward_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_ward_X)
+```
 
 ## DBSCAN
 
@@ -652,7 +1090,7 @@ abline(h = 1.8, col = c4)
 ```{r}
 db_fit <- dbscan(X2, eps = 1.8, minPts = 5)
 colors_db <- c(c1, c2, c3)[db_fit$cluster + 1]
-plot(X2[,1:2], pch = 19, col = colors_db, xlab = "First PC",
+plot(df_two[,1:2], pch = 19, col = colors_db, xlab = "First PC",
      ylab = "Second PC")
 ```
 
@@ -692,8 +1130,17 @@ mb_means <- cluster_means(Mclust_X$classification, first = 1)
 kable(mb_means)
 ```
 
+## Conclusions
 
+We have tried different methods for clustering our data. With the partitional methods, we have chosen two clusters and, while K-Means and K-Medoids obtain similar results, CLARA differs from them and creates clusters of unequal size. 
 
+With hierarchical clustering, we have observe that they create clusters of very unequal sizes except for the Ward and the complete methods. The Ward which would be our choice if we were to select one of them. 
+
+Model-based clustering suggested 4 as the optimum number of clusters, another evidence that suggests that the dependent variable does not condition all of the variables. 
+
+DBSCAN is not a good choice either, because all of the data seems to be grouped together and the method creates a cluster with very few instances, and another with almost all of the instances.
+
+Neither of them cluster the data into the groups that the dependent variable creates, but that makes sense as it is not its objective and our data does not appear to be separable by that. 
 
 
 
