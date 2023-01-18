@@ -21,6 +21,14 @@ require(pracma)
 require(rrcov)
 require(corrplot)
 require(GGally)
+require(dbscan)
+require(cluster)
+require(mclust)
+require(corpcor)
+require(RSpectra)
+require(factoextra)
+require(knitr)
+require(kableExtra)
 ```
 
 <!-- TODO: Introduction -->
@@ -98,7 +106,12 @@ On the followed strategy, we use the "Predictive Mean Matching Imputation"
 mean or median imputations.
 
 ```{r}
-data_im <- mice(data, m = 1, method = "pmm")
+pred_mat <- matrix(1, ncol(data), ncol(data), dimnames = list('row' = colnames(data), 'col' = colnames(data)))
+pred_mat[,9] <- 0
+for (i in 1:8){
+  pred_mat[i,i]<-0
+}
+data_im <- mice(data, m = 1, method = "pmm", )
 data    <- complete(data_im)
 ```
 
@@ -474,8 +487,216 @@ ggpairs(df_clean, aes(color = Outcome), legend = 1,
 ```
 
 <!-- TODO: PCA -->
-$\bar{x} = \frac{1}{n}\sum_{i=1}^n x_i$
-$a^2 = b^2 + c^2$
 <!-- definitive data: df_clean -->
 <!-- definitive attributes: df_clean[, xnames] -->
 <!-- definitive objective variable: df_clean$Outcome -->
+
+```{r, echo = F}
+c1 <- "deeppink4"
+c2 <- "gold2"
+c3 <- "darkorchid4"
+c4 <- "seagreen2"
+c5 <- "orange2"
+c6 <- "firebrick2"
+
+X <- df_clean[,-4]
+y <- df_clean[,4]
+y2 <- dplyr::recode(y, Negative = 0, Positive = 1)
+X2 <- scale(X)
+```
+
+# Unsupervised learning
+
+```{r, echo = F}
+cluster_means <- function(x, data = X, first = 1){
+  if(first == 0){
+    x <- x + 1
+  }
+  ls <- list()
+  groups_ <- sort(unique(x))
+  for (i in groups_){
+    ls[[i]] <- data[x == i,]
+  }
+  z <- sapply(ls, function(x) sapply(x, mean, na.rm = T))
+  z <- as.data.frame(z)
+  colnames(z) <- paste("Cluster", 1:length(groups_), sep = " ")
+  z2 <- z
+  return(z2)
+}
+
+cluster_classification <- function(x, y = y2, first = 1){
+  x <- x - first
+  prev <- table(x, y)
+  if(prev[1,1] + prev[2,2] > prev[1,2] + prev[2,1]){
+    f <- prev
+  } else{
+    f <- table(1-x, y)
+  }
+  dimnames(f) <- list("Pred" = c("Negative", "Positive"), "Actual" = c("Negative", "Positive"))
+  f2 <- f
+  return(f)
+}
+```
+
+## Partitional clustering
+
+### Number of clusters
+
+We'll firstly decide how many clusters we want to create. We'll use the silhoutte method and the gap statistic. The silhoutte method:
+
+```{r}
+fviz_nbclust(X2, kmeans, method = "silhouette", k.max = 10)
+```
+As we can see, this indicates that the optimum number of clusters is 2.
+
+The gap statistic:
+
+```{r, results = "hide"}
+gap_stat <- clusGap(X2, FUN = kmeans, K.max = 10, B = 100)
+```
+```{r}
+fviz_gap_stat(gap_stat, linecolor = c1, maxSE = 
+                list(method = "firstSEmax", SE.factor = 1))
+```
+This also suggests that the optimal number of clusters is 2.
+
+### K-Means
+
+The results of k-means clustering are the following: 
+
+```{r}
+kmeans_X <- kmeans(X2, centers = 2, iter.max = 1000, nstart = 100)
+
+kmeans_col <- c(c1, c2)[kmeans_X$cluster]
+plot(X2[,1:2], col = kmeans_col, main = "First two PCs", 
+     xlab = "First PC", ylab = "Second PC", pch  = 16)
+```
+
+Let's see the average in each variable for the clusters:
+
+```{r}
+kmeans_means <- cluster_means(kmeans_X$cluster)
+kable(kmeans_means)
+```
+
+We can also see the confusion matrix with our target variable, although we must remember that this is not the objective of unsupervised learning.
+
+```{r}
+kable(cluster_classification(kmeans_X$cluster, first = 1))
+```
+
+As we can see, the clusters are not exactly coincident with the target variable.
+
+## K-Medoids
+
+As all of our attributes are numerical and we don't have any reason not to, we will use Euclidean distance.
+
+```{r}
+pam_X <- pam(X2, k = 2, metric = "euclidean", stand = FALSE)
+pam_col <- c(c1, c2)[pam_X$cluster]
+
+plot(X2[,1:2], col = pam_col, main = "First two PCs", 
+     xlab = "First PC", ylab = "Second PC", pch = 19)
+```
+
+We obtain a very similar result than with K-Means.
+
+```{r}
+pam_means <- cluster_means(pam_X$cluster, first = 1)
+kable(pam_means)
+```
+Again, the confusion matrix is the following:
+
+```{r}
+cluster_classification(pam_X$cluster)
+```
+Very similar results than with K-Means.
+
+### CLARA
+
+```{r}
+clara_X <- clara(X2, k = 2, metric = "euclidean", stand=FALSE)
+clara_col <- c(c1, c2)[clara_X$cluster]
+
+plot(X2[,1:2], col = clara_col, main = "First two PCs", 
+     xlab = "First PC", ylab = "Second PC", pch = 19)
+```
+Again, we can observe that the results are very similar than with both K-Means and K-Medoids.
+
+```{r}
+clara_means <- cluster_means(clara_X$cluster, first = 1)
+kable(clara_means)
+```
+
+```{r}
+cluster_classification(clara_X$cluster)
+```
+## Hierarchical clustering
+
+### Single linkage
+
+### Complete linkage
+
+### Average linkage
+
+### Ward linakge
+
+## DBSCAN
+
+```{r}
+minPts <- 5
+kNNdistplot(X2, k = minPts - 1)
+abline(h = 1.8, col = c4)
+```
+
+```{r}
+db_fit <- dbscan(X2, eps = 1.8, minPts = 5)
+colors_db <- c(c1, c2, c3)[db_fit$cluster + 1]
+plot(X2[,1:2], pch = 19, col = colors_db, xlab = "First PC",
+     ylab = "Second PC")
+```
+
+```{r}
+table(db_fit$cluster)
+```
+
+The clusters have very different sizes, and this is not a good indicator of a good split. The averages are:
+
+```{r, echo = F}
+db_means <- cluster_means(db_fit$cluster, first = 0)
+kable(db_means)
+```
+We can also see the confusion matrix with our target variable, although we must remember that this is not the objective of unsupervised learning.
+
+```{r}
+kable(cluster_classification(db_fit$cluster, first = 0))
+```
+
+## Model-based clustering
+
+```{r}
+BIC_X <- mclustBIC(X2, G = 1:5)
+plot(BIC_X)
+summary(BIC_X)
+```
+
+The suggested number of clusters is 4. However, we can see that there is not much difference between choosing 2, 3, 4 and 5. The best models are EEE (ellipsoidal, equal volume, shape and orientation) with 4 clusters, and VEE (ellipsoidal, equal shape and orientation) with 4 and 5 clusters. 
+
+```{r}
+Mclust_X <- Mclust(X2, x = BIC_X, verbose = F)
+summary(Mclust_X)
+```
+
+```{r}
+mb_means <- cluster_means(Mclust_X$classification, first = 1)
+kable(mb_means)
+```
+
+
+
+
+
+
+
+
+
