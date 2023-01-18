@@ -740,7 +740,7 @@ As can be seen, with the threshold=$0.1$ we obtain a high sensitivity but a low 
 ```{r}
 test_prob = predict(model_glm, newdata = X_test_2, type = "response")
 
-ROC = plot.roc(Y_test, test_prob,
+ROC_lr = plot.roc(Y_test, test_prob,
          main="Confidence interval of a threshold", percent=TRUE,
          ci=TRUE, of="thresholds", # compute AUC (of threshold)
          thresholds="best", # select the (best) threshold
@@ -749,14 +749,14 @@ ROC = plot.roc(Y_test, test_prob,
 ```
 It is around $0.4$
 ```{r}
-ROC
+ROC_lr
 ```
 
 If we compute the predictions with the new threshold:
 
 ```{r}
 pred <- predict(model_glm, X_test_2, type = "response") > 
-  as.numeric(rownames(ROC$ci$specificity))
+  as.numeric(rownames(ROC_lr$ci$specificity))
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm <- table(Y_test, pred)
@@ -769,25 +769,299 @@ We can see a much better confussion matrix, and, if we compute de BAC:
 BAC <- bac(cm)
 BAC
 ```
-It is much better now.
-
+It has improven a lot.
 ```{r}
 colors_errors <- c(color_4,color_3)[1*(Y_test==pred)+1]
 plot(1:n_test,prob_lr_test,col=colors_errors,pch=20,type="p",
-     xlab="Test sample",ylab="Probabilities of Non-Diabetes",
-     main="Probabilities of Non-Diabetes")
-abline(h=as.numeric(rownames(ROC$ci$specificity)))
+     xlab="Test sample",ylab="Probabilities of Diabetes",
+     main="Probabilities of Diabetes")
+abline(h=as.numeric(rownames(ROC_lr$ci$specificity)))
 ```
 
 
 
 ## Methods based on the Bayes Theorem
 
-### Linear discriminant dnalysis
-### Quadraric discriminant analysis
-### Naive Bayes
+### Linear discriminant analysis (LDA)
+
+First, we train the model by:
+
+```{r}
+lda_train <- lda(Y_train~.,data=X_train)
+```
+As it is a bayesian method, it consider prior probabilities so it is taking into account that the dataset is balanced. The prior probabilities are:
+
+```{r}
+lda_train$prior
+```
+that are the same as the proportion of people with and without diabetes in our dataset:
+```{r}
+c(pr_no, pr_yes)
+```
+
+With the model fitted, we can make the predictions as:
+
+```{r}
+lda_test <- predict(lda_train,newdata=X_test)
+```
+
+And save the predicted classes as:
+
+```{r}
+lda_Y_test <- lda_test$class
+```
+
+And the confusion table is:
+
+```{r}
+cm_LDA <- confusionMatrix(table(Y_test,lda_Y_test), positive="Positive")
+cm_LDA$table
+```
+
+
+```{r}
+lda_TER <- mean(Y_test!=lda_Y_test)
+lda_TER
+lda_accuracy <- 1 - lda_TER
+lda_accuracy
+```
+Computing the BAC we can see that it is much better than the default logistic regression. The reason behind this is that, as said earlier, due to its bayesian nature, it takes into account that the problem is unbalanced.
+If we compute its sensitivity and specificity:
+
+```{r}
+test_tab_50_lda = table(predicted = lda_Y_test, actual = Y_test)
+test_con_mat_50_lda = confusionMatrix(test_tab_50_lda, positive = "Positive")
+
+metrics = rbind(
+
+  c( 
+    test_con_mat_50_lda$byClass["Sensitivity"], 
+    test_con_mat_50_lda$byClass["Specificity"])
+)
+rownames(metrics) = c("c = 0.50")
+colnames(metrics) = c("Sensitivity", "Specificity")
+metrics
+```
+It can be seen that the specificity is much larger than the sensitivity. We can also compute the BAC by:
+
+```{r}
+bac(cm_LDA$table)
+```
+
+
+Recall can obtain the conditional probabilities of the classifications made with the test sample:
+```{r}
+prob_lda_Y_test <- lda_test$posterior
+head(prob_lda_Y_test)
+```
+
+Thanks to this, we can treat it as a scoring classifier. In order to find the optimum thresold, we can plot a roc curve:
+
+```{r}
+test_prob = predict(lda_train, newdata = X_test, type = "response")
+test_prob <- test_prob$posterior[,2]
+
+ROC_lda = plot.roc(Y_test, test_prob,
+               main="Confidence interval of a threshold", percent=TRUE,
+               ci=TRUE, of="thresholds", 
+               thresholds="best", 
+               print.thres="best",
+               print.auc=TRUE) 
+```
+
+It seems that, according to the ROC curve, the optimum threshold is:
+```{r}
+as.numeric(rownames(ROC_lda$ci$specificity))
+```
+
+
+If we compute the predictions with the new threshold:
+
+```{r}
+pred <- predict(lda_train, X_test, type = "response")$posterior[,2] > 
+  as.numeric(rownames(ROC_lda$ci$specificity))
+pred <- pred * 1
+pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
+cm_lda_opt <- table(Y_test, pred)
+cm_lda_opt
+```
+
+We can also compute the BAC:
+
+```{r}
+BAC <- bac(cm)
+BAC
+```
+
+It is similar to the BAC computed in the logistic regression.
+
+Finally, we plot the probability of being positive of diabetes and the threshold:
+```{r}
+probs <- predict(lda_train, X_test, type = "response")$posterior[,2]
+colors_errors <- c(color_4,color_3)[1*(Y_test==pred)+1]
+plot(1:n_test,probs,col=colors_errors,pch=20,type="p",
+     xlab="Test sample",ylab="Probabilities of Diabetes",
+     main="Probabilities of Diabetes")
+abline(h=as.numeric(rownames(ROC_lda$ci$specificity)))
+```
+
+
+### Quadraric discriminant analysis (QDA)
+
+First, we train the model by:
+
+```{r}
+qda_train <- qda(Y_train~.,data=X_train)
+```
+The workflow for this method will be mostly the same as with the LDA.
+
+
+We make the predictions as:
+
+```{r}
+qda_test <- predict(lda_train,newdata=X_test)
+```
+
+We can also save the predictions as:
+
+```{r}
+qda_Y_test <- lda_test$class
+```
+
+And the confusion table is:
+
+```{r}
+cm_QDA <- confusionMatrix(table(Y_test,qda_Y_test), positive="Positive")
+cm_QDA$table
+```
+This is the same confusion table as for the default LDA! This means that accuracy, sensitivity, specificity... will be all the same.
+
+
+Finally, we plot the probabilities of having diabetes and the default threshold.
+
+```{r}
+probs <- predict(qda_train, X_test, type = "response")$posterior[,2]
+colors_errors <- c(color_4,color_3)[1*(Y_test==qda_Y_test)+1]
+plot(1:n_test,probs,col=colors_errors,pch=20,type="p",
+     xlab="Test sample",ylab="Probabilities of Diabetes",
+     main="Probabilities of Diabetes")
+abline(h=0.5)
+```
+
+
+
+### Naive Bayes (NB)
+
+We start by training the naive-bayes model:
+
+```{r}
+nb_train <- gaussian_naive_bayes(X_train,Y_train)
+```
+
+And computing the predictions:
+
+```{r}
+nb_test <- predict(nb_train,newdata=as.matrix(X_test),type="prob")
+```
+
+Next, we generate the vector of classifications:
+```{r}
+nb_Y_test <- as.factor(ifelse(nb_test[,2]>0.5, "Positive", "Negative"))
+```
+
+
+```{r}
+cm_nb <- confusionMatrix(table(Y_test,nb_Y_test), positive = "Positive")
+cm_nb$table
+```
+
+
+```{r}
+nb_TER <- mean(Y_test!=nb_Y_test)
+nb_TER
+nb_acc <- 1 - nb_TER
+nb_acc
+cm_nb$byClass["Sensitivity"]
+cm_nb$byClass["Specificity"]
+```
+
+
+```{r}
+test_prob <-  predict(nb_train, newdata = as.matrix(X_test), type = "prob")
+prob_nb_Y_test <- test_prob[,2]
+colors_errors <- c(color_4,color_3)[1*(Y_test==nb_Y_test)+1]
+plot(1:n_test,prob_nb_Y_test,col=colors_errors,pch=20,type="p",
+     xlab="Test sample",ylab="Probabilities of non diabetes",
+     main="Probabilities of non diabetes")
+abline(h=0.5)
+```
+
+
+```{r}
+ROC_nb = plot.roc(Y_test, prob_nb_Y_test,
+               main="Confidence interval of a threshold", percent=TRUE,
+               ci=TRUE, of="thresholds",
+               thresholds="best", 
+               print.thres="best",
+               print.auc=TRUE) 
+ROC_nb
+```
+
 
 ## KNN (k-nearest neighbors)
+
+The last supervised classification method that we are going to test is KNN.
+
+First, we are going to find the best $K$ value using cross-validation.
+
+```{r}
+LER <- rep(NA,15)
+for (i in 3 : 15){
+  knn_output <- knn.cv(X_train,Y_train,k=i)
+  LER[i] <- 1 - mean(knn_output==Y_train)
+}
+LER
+plot(1:15,LER,pch=20,col=color_1,type="b",
+     xlab="k",ylab="LER",main="LER for the diabetes dataset")
+```
+
+
+```{r}
+k <- which.min(LER)
+k
+```
+
+
+```{r}
+knn_Y_test <- knn(X_train,X_test,Y_train,k=k,prob=T)
+head(knn_Y_test)
+summary(knn_Y_test)
+table(Y_test,knn_Y_test)
+knn_TER <- mean(Y_test!=knn_Y_test)
+knn_TER
+```
+
+
+```{r}
+prob_knn_Y_test <- ifelse(knn_Y_test == "Positive", attributes(knn_Y_test)$prob, 1 - attributes(knn_Y_test)$prob)
+```
+
+
+```{r}
+head(prob_knn_Y_test)
+prob <- 2*ifelse(knn_Y_test == "-1", prob_knn_Y_test, 1-prob_knn_Y_test) - 1
+```
+
+
+
+```{r}
+# Make a plot of the probabilities of the winner group
+# In green, good classifications, in red, wrong classifications
+
+colors_errors <- c(color_4,color_3)[1*(Y_test==knn_Y_test)+1]
+plot(1:n_test,prob_knn_Y_test,col=colors_errors,pch=20,type="p",
+     xlab="Test sample",ylab="Diabetes probabilities",main="Diabetes probabilities")
+```
 
 
 
