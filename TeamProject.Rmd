@@ -125,10 +125,11 @@ On the followed strategy, we use the "Predictive Mean Matching Imputation"
 mean or median imputations.
 
 ```{r}
-pred_mat <- matrix(1, ncol(data), ncol(data), dimnames = list('row' = colnames(data), 'col' = colnames(data)))
-pred_mat[,9] <- 0
-for (i in 1:8){
-  pred_mat[i,i]<-0
+pred_mat <- matrix(1, ncol(data), ncol(data),
+    dimnames = list("row" = colnames(data), "col" = colnames(data)))
+pred_mat[, 9] <- 0
+for (i in 1:8) {
+  pred_mat[i, i] <- 0
 }
 data_im <- mice(data, m = 1, method = "pmm", predictorMatrix = pred_mat, seed = seed)
 data    <- complete(data_im)
@@ -331,7 +332,7 @@ histogram_by_groups(data, "LogAge")
 
 ```{r}
 # Some convenience
-df  <- subset(data, select = -c(Pregnancies, Insulin, BMI, DiabetesPedigreeFunction, Age))
+df <- subset(data, select = -c(Pregnancies, Insulin, BMI, DiabetesPedigreeFunction, Age))
 df0     <-  df[df$Outcome == "Negative", ]
 df1     <-  df[df$Outcome == "Positive", ]
 xnames  <- names(df)[! names(df) %in% c("Outcome")]
@@ -380,8 +381,6 @@ computation, we use a robust estimation using
 the "Fast MCD" (Minimum Covariance Determinant) estimator.
 We set main parameter, `alpha`, which determines the percentage
 of the data to use, at $0.85$.
-
-<!-- TODO: refactor the prints -->
 
 ```{r}
 our_corrplot <- function(cov_mat) {
@@ -619,8 +618,8 @@ cannot drop them from the posterior analysis [^4].
 different dimensionality reduction techniques which may or may not
 discard some variables.
 
-```{r, fig.size = c(8, 8)}
-biplot(df_pcs, cex = c(0.5, 0.8))
+```{r, fig.size = c(16, 16)}
+biplot(df_pcs, cex = c(0.4, 1), col = c(c2, c1))
 ```
 
 Looking into the variace explained by each PC, we see
@@ -638,7 +637,7 @@ Let us for the following consider 4, equivalent
 to setting a threshold at $10\%$ of explained variance.
 
 ```{r, fig.size = c(8, 4)}
-fviz_eig(df_pcs, ncp = 17, addlabels = TRUE, barfill = c1, barcolor = "white")
+fviz_eig(df_pcs, ncp = 17, addlabels = TRUE, barfill = c2, barcolor = c1)
 ```
 
 Looking at the scatterplots
@@ -943,8 +942,7 @@ The gap statistic:
 ```{r, results = "hide"}
 set.seed(seed)
 gap_stat <- clusGap(X2, FUN = kmeans, K.max = 10, B = 100)
-```
-```{r}
+
 fviz_gap_stat(gap_stat, linecolor = c1, maxSE = 
                 list(method = "firstSEmax", SE.factor = 1))
 ```
@@ -1060,7 +1058,8 @@ rect.hclust(complete_X, k = 2, border = c1)
 
 ```{r}
 cl_complete_X <- cutree(complete_X, 2)
-kable(cluster_classification(cl_complete_X))  %>% kable_styling(latex_options = "HOLD_position")
+kable(cluster_classification(cl_complete_X))  %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
 Now, we can see that the sizes of the clusters are much more similar, although one is twice as big as the other. 
 
@@ -1140,7 +1139,8 @@ kable(db_means) %>% kable_styling(latex_options = "HOLD_position")
 We can also see the confusion matrix:
 
 ```{r}
-kable(cluster_classification(db_fit$cluster, first = 0)) %>% kable_styling(latex_options = "HOLD_position")
+kable(cluster_classification(db_fit$cluster, first = 0)) %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
 
 ## Model-based clustering
@@ -1247,7 +1247,8 @@ table <- data.frame("Classified_as_negative" = c("True negative (TN)", "False ne
                     "Classified_as_positive" = c("False positive (FP)", "True positive (TP)"))
 rownames(table) <- c("Instances_actually_negative", "Instances_actually_positive")
 
-kable(table) %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+kable(table) %>% kable_styling(latex_options = "striped") %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
 With this in mind, we can also define:
 
@@ -1293,7 +1294,8 @@ With the predictions computed, we can show the confusion matrix:
 ```{r}
 cm_knn <- confusionMatrix(table(Y_test,knn_Y_test), positive = "Positive")
 
-cm_knn$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+cm_knn$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
 
 Looking at some of the metrics defined earlier, we can see that the results are not great.
@@ -1336,7 +1338,8 @@ Finally, we are going to plot the probability of being positive on diabetes for 
 The ones in green are correctly classified, while those in red have been classified incorrectly.
 
 ```{r}
-prob_knn_Y_test <- ifelse(knn_Y_test == "Positive", attributes(knn_Y_test)$prob, 1 - attributes(knn_Y_test)$prob)
+prob_knn_Y_test <- ifelse(knn_Y_test == "Positive",
+    attributes(knn_Y_test)$prob, 1 - attributes(knn_Y_test)$prob)
 prob <- 2*ifelse(knn_Y_test == "-1", prob_knn_Y_test, 1-prob_knn_Y_test) - 1
 colors_errors <- c(c4,c3)[1*(Y_test==knn_Y_test)+1]
 plot(1:n_test,prob_knn_Y_test,col=colors_errors,pch=20,type="p",
@@ -1363,13 +1366,15 @@ We can see that the most important variables are *Glucose*, *LogBMI*, *LogDPF* a
 Next, we make the predictions and check the number of instances classified in group:
 ```{r}
 lr_test <- predict(lr_train,newdata=as.data.frame(X_test))
-summary(lr_test) %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+summary(lr_test) %>% kable() %>% kable_styling(latex_options = "striped") %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
  
 We compute the confusion matrix:
 ```{r}
 cm_lg_default <- confusionMatrix(table(Y_test,lr_test))
-cm_lg_default$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+cm_lg_default$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
 It can be observed that the model classifies well those individuals who do not have diabetes, but has a hard time classifying those individuals who have diabetes. This is because the dataset is not balanced.
 
@@ -1425,7 +1430,8 @@ final_df <- as.data.frame(cbind(X_train, Y_train))
 final_df$Y_train <- ifelse(final_df$Y_train=="Negative", 0, 1)
 mod_zero  <- glm(Y_train ~ 1, family = binomial, data = final_df)
 mod_all   <- glm(Y_train ~ ., family = binomial, data = final_df)
-model_glm <- MASS::stepAIC(mod_zero, scope = list(lower = mod_zero, upper = mod_all), direction = "both", trace = 0, k = log(nrow(final_df)))
+model_glm <- MASS::stepAIC(mod_zero, scope = list(lower = mod_zero, upper = mod_all),
+                            direction = "both", trace = 0, k = log(nrow(final_df)))
 ```
 
 ```{r}
@@ -1442,7 +1448,8 @@ X_test_2 <- X_test[, names(model_glm$coefficients)[-1]]
 pred <- predict(model_glm, X_test_2, type="response") > 0.5
 pred <- c("Negative", "Positive")[(1*pred)+1]
 cm <- table(Y_test, pred)
-cm %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+cm %>% kable() %>% kable_styling(latex_options = "striped") %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
 
 And almost the same BAC:
@@ -1498,7 +1505,8 @@ metrics = rbind(
 rownames(metrics) = c("c = 0.10", "c = 0.50", "c = 0.90")
 colnames(metrics) = c("Accuracy", "Sensitivity", "Specificity")
 
-metrics %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+metrics %>% kable() %>% kable_styling(latex_options = "striped") %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
 As can be seen, with the threshold=$0.1$ we obtain a high sensitivity but a low specificity and, for the threshold=$0.9$ a low sensitivity but a low specificity. We can plot a ROC curve to search for the best threshold.
 ```{r}
@@ -1524,7 +1532,8 @@ pred <- predict(model_glm, X_test_2, type = "response") >
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm_lr <- `confusionMatrix`(table(Y_test, pred), positive="Positive")
-cm_lr$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+cm_lr$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
 ```{r, echo=FALSE}
 predictors_tables[[2]] <- cm_lr
@@ -1581,7 +1590,7 @@ c(pr_no, pr_yes)
 With the model fitted, we can make the predictions as:
 
 ```{r}
-lda_test <- predict(lda_train,newdata=X_test)
+lda_test <- predict(lda_train, newdata=X_test)
 ```
 
 And save the predicted classes as:
@@ -1594,13 +1603,14 @@ The confusion matrix is:
 
 ```{r}
 cm_LDA <- confusionMatrix(table(Y_test,lda_Y_test), positive="Positive")
-cm_LDA$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+cm_LDA$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
+    kable_styling(latex_options = "HOLD_position")
 ```
 
 Computing the Accuracy and the TER might be interesting too.
 
 ```{r}
-lda_TER <- mean(Y_test!=lda_Y_test)
+lda_TER <- mean(Y_test != lda_Y_test)
 lda_TER
 lda_accuracy <- 1 - lda_TER
 lda_accuracy
@@ -1804,7 +1814,7 @@ ROC_nb
 
 <!---
 ```{r}
-nb_Y_test_tuned <- as.factor(ifelse(nb_test[,2]>as.numeric(rownames(ROC_lda$ci$specificity)), "Positive", "Negative"))
+nb_Y_test_tuned <- as.factor(ifelse(nb_test[,2] > as.numeric(rownames(ROC_lda$ci$specificity)), "Positive", "Negative"))
 cm_nb_tuned <- confusionMatrix(table(Y_test,nb_Y_test_tuned), positive = "Positive")
 cm_nb_tuned$table
 ```

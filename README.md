@@ -13,3 +13,5 @@
 - [ ] Revisar si se puede usar kable en matrices de covarianza
 
 - [ ] Conclusiones redactadas
+
+- [ ] Introducción
