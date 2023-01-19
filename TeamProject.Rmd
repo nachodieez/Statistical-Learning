@@ -487,7 +487,6 @@ ggpairs(df_clean, aes(color = Outcome), legend = 1,
     scale_color_manual(values = c("pink", "deeppink4")) + labs(fill = "Outcome")
 ```
 
-<<<<<<< HEAD
 # Multivariate analysis and dimensionality reduction
 
 Our data has few variables, which makes dimensionality
