@@ -1081,6 +1081,8 @@ factoextra::fviz_silhouette(sil_ward_X)
 
 ## DBSCAN
 
+We fix MP to 5, and we'll see the k-distance graph to see what would be a good value for $\eps$.
+
 ```{r}
 minPts <- 5
 kNNdistplot(X2, k = minPts - 1)
@@ -1098,12 +1100,13 @@ plot(df_two[,1:2], pch = 19, col = colors_db, xlab = "First PC",
 table(db_fit$cluster)
 ```
 
-The clusters have very different sizes, and this is not a good indicator of a good split. The averages are:
+The clusters have very different sizes, and this is an indicator of a unique region with high data density. The averages are:
 
 ```{r, echo = F}
 db_means <- cluster_means(db_fit$cluster, first = 0)
 kable(db_means)
 ```
+
 We can also see the confusion matrix with our target variable, although we must remember that this is not the objective of unsupervised learning.
 
 ```{r}
