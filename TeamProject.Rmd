@@ -50,7 +50,50 @@ seed <- 42
 set.seed(seed)
 ```
 
-<!-- TODO: Introduction -->
+# Introduction
+
+This dataset contains information regarding diagnostic measurements of females over 21 years old of Pima Indian Heritage. It is comprised of 768 individuals and 9 variables. The dataset can be found in <https://www.kaggle.com/datasets/uciml/pima-indians-diabetes-database>. 
+
+We follow with a description of our variables. 
+
+### Outcome
+
+Qualitative nominal variable that indicates if the individual has diabetes or not.
+
+Its values has been factorized as *Positive* for positive diabetes tested individuals
+and *Negative* for those without diabetes.
+
+### Pregnancies
+
+Quantitative discrete variable detailing the number of times the individual has been pregnant.
+
+### Glucose
+
+Quantitative continuous variable that reflects the plasma glucose concentration at 2 hours in an oral glucose tolerance test in mg/dl.
+
+### Blood Pressure
+
+Quantitative continuous variable that measures diastolic blood pressure, in mm Hg.
+
+### Skin thickness
+
+Quantitative continuous variable that measures the triceps skin fold thickness in mm.
+
+### Insulin
+
+Quantitative continuous variable that measures the 2-hour serum insulin in $\mu$U/ml. This units are quantity of insulin matter over volume of the disolution (in the International System of Units it would be measured in mol/m${}^3$), a density of insulin.
+
+### BMI
+
+Quantitative continuous variable that measures the body mass index (BMI), defined as (weight in kg) / (height in m)$^2$.
+
+### Diabetes pedigree function
+
+Quantitative continuous variable that indicates the function which scores likelihood of diabetes based on family history.
+
+### Age
+
+Quantitative continuous variable that indicates the age of the individual in years.
 
 # Descriptive Analysis and Preprocessing
 
@@ -404,7 +447,8 @@ mcd_est <- CovMcd(df[xnames], alpha = 0.85, nsamp = "deterministic")
 print("The mean vector is:")
 print(mcd_est$center)
 print("The covariance matrix is:")
-print(round(mcd_est$cov, 4))
+m_cov <- round(mcd_est$cov, 2)
+kable(m_cov)
 ```
 
 ```{r, fig.size = c(8, 8)}
@@ -425,8 +469,8 @@ mcd_pos <- CovMcd(df1[xnames], alpha = 0.85, nsamp = "deterministic")
 print("### Negative class ###")
 print("The mean vector is:")
 print(mcd_neg$center)
-print("The covariance matrix is:")
-print(round(mcd_neg$cov, 4))
+m_cov_neg <- round(mcd_neg$cov, 2)
+kable(m_cov_neg)
 ```
 
 ```{r, fig.size = c(8, 8)}
@@ -437,8 +481,8 @@ our_corrplot(mcd_neg$cov)
 print("### Positive class ###")
 print("The mean vector is:")
 print(mcd_pos$center)
-print("The covariance matrix is:")
-print(round(mcd_pos$cov, 4))
+m_cov_pos <- round(mcd_pos$cov, 2)
+kable(m_cov_pos)
 ```
 
 ```{r, fig.size = c(8, 8)}
@@ -1158,6 +1202,13 @@ The suggested number of clusters is 4. However, we can see that there is not muc
 Mclust_X <- Mclust(X2, x = BIC_X, verbose = F)
 summary(Mclust_X)
 ```
+
+```{r}
+colors_db <- c("green", "red", "orange", "blue")[Mclust_X$classification]
+plot(df_two[,1:2], pch = 19, col = colors_db, xlab = "First PC",
+     ylab = "Second PC")
+```
+There is significant overlap between the clusters. 
 
 ```{r}
 mb_means <- cluster_means(Mclust_X$classification, first = 1)
