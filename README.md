@@ -4,12 +4,12 @@
 
 - [x] Colores
 
-- [] Revisar código que no entra en pantalla
+- [ ] Revisar código que no entra en pantalla
 
-- [] Quitar definición BIC
+- [ ] Quitar definición BIC
 
 - [x] Añadir Accuracy y TER en parte de Pablo
 
-- [] Revisar si se puede usar kable en matrices de covarianza
+- [ ] Revisar si se puede usar kable en matrices de covarianza
 
-- [] Conclusiones redactadas
+- [ ] Conclusiones redactadas
