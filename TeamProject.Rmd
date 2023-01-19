@@ -574,7 +574,7 @@ We can see that the most important variables are *Glucose*, *LogBMI*, *LogDPF* a
 Next, we make the predictions and check the number of instances classified in group:
 ```{r}
 lr_test <- predict(lr_train,newdata=as.data.frame(X_test))
-summary(lr_test)
+summary(lr_test) %>% kable() %>% kable_styling(latex_options = "striped")
 ```
 It may be interesting to see the confusion matrix and the TER (Test Error Rate). The confussion matrix is:
 
@@ -586,6 +586,7 @@ rownames(table) <- c("Instances_actually_negative", "Instances_actually_positive
 kable(table) %>% kable_styling(latex_options = "striped")
 ```
 With that in mind, we can define:
+
 - $TPR=TP/(TP+FN)$ (True Positive Rate i.e. Sensitivity)
 - $FNR=FN/(TP+FN)$ (False Negative Rate)
 - $FPR=FP/(FP+TN)$ (False Positive Rate)
@@ -593,14 +594,14 @@ With that in mind, we can define:
 - $\text{Accuracy}=(TP+TN)/(TP+TN+FP+FN)$
 - $BAC=(TPR+TNR)/2$
 
-The TER is no more than $1 - \text{Accuracy}$. In other words, the percentage of missclassified individuals.
+The TER is no more than $1 - \text{Accuracy}$. In other words, the percentage of misclassified individuals.
  
-We compute the confussion matrix:
+We compute the confusion matrix:
 ```{r}
 cm_lg_default <- table(Y_test,lr_test)
-cm_lg_default
+cm_lg_default %>% kable() %>% kable_styling(latex_options = "striped")
 ```
-It can be observed that the model classifies well those individuals who do not have diabetes, but has a hard time classifying those individuals who have diabetes, probably because the dataset is not balanced.
+It can be observed that the model classifies well those individuals who do not have diabetes, but has a hard time classifying those individuals who have diabetes. This is because the dataset is not balanced.
 
 Now, we compute both the TER and the accuracy:
 
@@ -612,7 +613,7 @@ lr_ACC
 ```
 The value obtained is not bad, but we must keep in mind that the classifier is doing really bad in classifying diabetic individuals. This can be seen more clearly if we calculate the Balanced Accuracy (BAC).
 
-First we define a function to compute the BAC given a confussion matrix:
+First we define a function to compute the BAC given a confusion matrix:
 
 ```{r}
 bac <- function(cm){
@@ -625,7 +626,7 @@ Thus, we can compute the BAC by using it:
 bac(cm_lg_default)
 ```
 
-It is observed that the value obtained is noticeably worse than the accuracy.
+It is observed that the value obtained is noticeably worse than the accuracy, as it balances sensitivity and specificity.
 
 ```{r}
 # Obtain the probabilities of non-diabetes
@@ -645,7 +646,7 @@ abline(h=0.5)
 
 We are not happy with the performance of the model so we are going to try to improve it.
 
-In order to try to solve it, we are going to first do stepwise model selection. 
+In order to try to improve it, we are going to first do stepwise model selection. 
 The information criterion that we are going to use in order to evaluate the measure the performance of the model is the *Bayesian Information Criterion* (BIC), and it is defined as
 
 $$
@@ -676,7 +677,7 @@ X_test_2 <- X_test[, names(model_glm$coefficients)[-1]]
 pred <- predict(model_glm, X_test_2, type="response") > 0.5
 pred <- c("Negative", "Positive")[(1*pred)+1]
 cm <- table(Y_test, pred)
-cm
+cm %>% kable() %>% kable_styling(latex_options = "striped")
 ```
 
 And almost the same BAC:
@@ -687,6 +688,8 @@ BAC
 ```
 
 As the logistic regression is a scoring classifier (i.e. a classifier that predicts a real value representing the probability that the instance belongs to a certain class, in our case, to be positive in diabetes) we can choose the threshold we can define the threshold at which we decide that the instance is considered to be positive for diabetes. Until now, we have been using $0.5$ as the threshold.
+
+Note that this is one of the many options available to handle imbalanced problems. Other approaches may be oversampling or undersampling, but we have chosen to use thresholding because we are using scoring classifiers.
 
 We define a function that takes the model, the data and a given threshold and returns the prediction given that threshold.
 
@@ -717,7 +720,6 @@ test_con_mat_50_lg = confusionMatrix(test_tab_50_lg, positive = "Positive")
 test_con_mat_90_lg = confusionMatrix(test_tab_90_lg, positive = "Positive")
 
 metrics = rbind(
-  
   c(test_con_mat_10_lg$overall["Accuracy"], 
     test_con_mat_10_lg$byClass["Sensitivity"], 
     test_con_mat_10_lg$byClass["Specificity"]),
@@ -742,10 +744,10 @@ test_prob = predict(model_glm, newdata = X_test_2, type = "response")
 
 ROC_lr = plot.roc(Y_test, test_prob,
          main="Confidence interval of a threshold", percent=TRUE,
-         ci=TRUE, of="thresholds", # compute AUC (of threshold)
-         thresholds="best", # select the (best) threshold
+         ci=TRUE, of="thresholds",
+         thresholds="best", 
          print.thres="best",
-         print.auc=TRUE) # also highlight this threshold on the plot
+         print.auc=TRUE) 
 ```
 It is around $0.4$
 ```{r}
@@ -760,7 +762,7 @@ pred <- predict(model_glm, X_test_2, type = "response") >
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm <- table(Y_test, pred)
-cm
+cm %>% kable() %>% kable_styling(latex_options = "striped")
 ```
 
 We can see a much better confussion matrix, and, if we compute de BAC:
@@ -769,7 +771,7 @@ We can see a much better confussion matrix, and, if we compute de BAC:
 BAC <- bac(cm)
 BAC
 ```
-It has improven a lot.
+It has improven a quite a bit.
 ```{r}
 colors_errors <- c(color_4,color_3)[1*(Y_test==pred)+1]
 plot(1:n_test,prob_lr_test,col=colors_errors,pch=20,type="p",
@@ -781,6 +783,16 @@ abline(h=as.numeric(rownames(ROC_lr$ci$specificity)))
 
 
 ## Methods based on the Bayes Theorem
+
+We are going to try three methods based on the Bayes Theorem:
+
+- Linear discriminant analysis
+- Quadratic discriminant analysis
+- Naive Bayes
+
+These methods estimate the prior probabilities as the proportion of available observations belonging to each class and they make predictions selecting the class for which the posterior probability becomes maximum.
+
+As they take into account the prior probabilities, these methods are very convenient for unbalanced problems (as the problem we are facing), so minimal tuning may be needed.
 
 ### Linear discriminant analysis (LDA)
 
@@ -815,7 +827,7 @@ And the confusion table is:
 
 ```{r}
 cm_LDA <- confusionMatrix(table(Y_test,lda_Y_test), positive="Positive")
-cm_LDA$table
+cm_LDA$table %>% kable() %>% kable_styling(latex_options = "striped")
 ```
 
 
@@ -883,7 +895,7 @@ pred <- predict(lda_train, X_test, type = "response")$posterior[,2] >
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm_lda_opt <- table(Y_test, pred)
-cm_lda_opt
+cm_lda_opt %>% kable() %>% kable_styling(latex_options = "striped")
 ```
 
 We can also compute the BAC:
@@ -893,7 +905,7 @@ BAC <- bac(cm)
 BAC
 ```
 
-It is similar to the BAC computed in the logistic regression.
+It is similar to the BAC computed in the logistic regression after tuning the threshold.
 
 Finally, we plot the probability of being positive of diabetes and the threshold:
 ```{r}
@@ -932,7 +944,7 @@ And the confusion table is:
 
 ```{r}
 cm_QDA <- confusionMatrix(table(Y_test,qda_Y_test), positive="Positive")
-cm_QDA$table
+cm_QDA$table %>% kable() %>% kable_styling(latex_options = "striped")
 ```
 This is the same confusion table as for the default LDA! This means that accuracy, sensitivity, specificity... will be all the same.
 
@@ -969,6 +981,7 @@ Next, we generate the vector of classifications:
 nb_Y_test <- as.factor(ifelse(nb_test[,2]>0.5, "Positive", "Negative"))
 ```
 
+By computing the confusion matrix, we can see that the method yields good results:
 
 ```{r}
 cm_nb <- confusionMatrix(table(Y_test,nb_Y_test), positive = "Positive")
@@ -978,9 +991,9 @@ cm_nb$table
 
 ```{r}
 nb_TER <- mean(Y_test!=nb_Y_test)
-nb_TER
+print(paste0("Test Error Rate: ",nb_TER))
 nb_acc <- 1 - nb_TER
-nb_acc
+print(paste0("Accuracy: ",nb_acc))
 cm_nb$byClass["Sensitivity"]
 cm_nb$byClass["Specificity"]
 ```
@@ -1007,6 +1020,12 @@ ROC_nb = plot.roc(Y_test, prob_nb_Y_test,
 ROC_nb
 ```
 
+```{r}
+nb_Y_test_tuned <- as.factor(ifelse(nb_test[,2]>as.numeric(rownames(ROC_lda$ci$specificity)), "Positive", "Negative"))
+cm_nb <- confusionMatrix(table(Y_test,nb_Y_test_tuned), positive = "Positive")
+cm_nb$table
+```
+
 
 ## KNN (k-nearest neighbors)
 
@@ -1015,16 +1034,17 @@ The last supervised classification method that we are going to test is KNN.
 First, we are going to find the best $K$ value using cross-validation.
 
 ```{r}
-LER <- rep(NA,15)
-for (i in 3 : 15){
+LER <- rep(NA,20)
+for (i in 3 : 20){
   knn_output <- knn.cv(X_train,Y_train,k=i)
   LER[i] <- 1 - mean(knn_output==Y_train)
 }
 LER
-plot(1:15,LER,pch=20,col=color_1,type="b",
+plot(1:20,LER,pch=20,col=color_1,type="b",
      xlab="k",ylab="LER",main="LER for the diabetes dataset")
 ```
 
+It seems that the optimal $K$ is
 
 ```{r}
 k <- which.min(LER)
@@ -1034,9 +1054,12 @@ k
 
 ```{r}
 knn_Y_test <- knn(X_train,X_test,Y_train,k=k,prob=T)
-head(knn_Y_test)
-summary(knn_Y_test)
 table(Y_test,knn_Y_test)
+```
+
+We compute the TER by:
+
+```{r}
 knn_TER <- mean(Y_test!=knn_Y_test)
 knn_TER
 ```
@@ -1065,9 +1088,23 @@ plot(1:n_test,prob_knn_Y_test,col=colors_errors,pch=20,type="p",
 
 
 
+## Conclusions of the section
 
+We have tried five different supervised classification methods:
 
+- Logistic regression (LR)
+- Linear discriminant analysis (LDA)
+- Quadratic discriminant analysis (QDA)
+- Naive Bayes (NB)
+- K-Nearest Neighbors (KNN)
 
+As we were faced with an unbalanced problem, it was not enough to look at metrics such as accuracy, and we had to consult others such as balanced accuracy, sensitivity or specificity. According to these metrics, the default LR did quite poorly, but after thresholding with the help of the ROC curve, we got really good results.
+
+On the other hand, and as we have commented throughout this section, Bayesian methods have the advantage in this type of problem that they take into account the a priori probability, so that by default they already consider that the problem is unbalanced. Thanks to this, they achieve very good results by default, but, depending on the levels of sensitivity and specificity to be achieved, it may be a good idea to perform thresholding.
+
+We believe that considering what levels of sensitivity and specificity we want to obtain is especially important in medical problems (such as the one we are facing), since, for certain problems, we may be especially interested in correctly classifying positive individuals (Sensitivity), in others negative individuals (Specificity), or in others in finding a balance (Balanced Accuracy).
+
+Sobre el KNN no tengo nada que decir XD
 
 
 
