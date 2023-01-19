@@ -31,6 +31,21 @@ require(naivebayes)
 require(pROC)
 require(caret)
 require(kableExtra)
+require(dbscan)
+require(cluster)
+require(mclust)
+require(corpcor)
+require(RSpectra)
+require(factoextra)
+require(knitr)
+require(ica)
+```
+
+```{r, echo = F}
+c1 <- "deeppink4"
+c2 <- "gold2"
+c3 <- "darkorchid4"
+c4 <- "seagreen2"
 ```
 
 <!-- TODO: Introduction -->
@@ -108,7 +123,12 @@ On the followed strategy, we use the "Predictive Mean Matching Imputation"
 mean or median imputations.
 
 ```{r}
-data_im <- mice(data, m = 1, method = "pmm")
+pred_mat <- matrix(1, ncol(data), ncol(data), dimnames = list('row' = colnames(data), 'col' = colnames(data)))
+pred_mat[,9] <- 0
+for (i in 1:8){
+  pred_mat[i,i]<-0
+}
+data_im <- mice(data, m = 1, method = "pmm", predictorMatrix = pred_mat)
 data    <- complete(data_im)
 ```
 
@@ -145,11 +165,11 @@ histogram_by_groups <- function(data, var, label = NULL) {
             scale_fill_manual(
                 name = "",
                 breaks = c("Positive", "Negative"),
-                values = c("Positive" = "deeppink4", "Negative" = "pink2")
+                values = c("Positive" = c1, "Negative" = c2)
             ) +
             xlab(label) + ylab("Relative frequency") + ggtitle(label) +
-            geom_vline(xintercept = mean(data1[[var]]), colour = "deeppink4") +
-            geom_vline(xintercept = mean(data0[[var]]), colour = "pink2")
+            geom_vline(xintercept = mean(data1[[var]]), colour = c1) +
+            geom_vline(xintercept = mean(data0[[var]]), colour = c2)
     p + annotate(
             "text",
             x = 0.9 * max(data1[var]),
@@ -313,16 +333,16 @@ df  <- subset(data, select = -c(Pregnancies, Insulin, BMI, DiabetesPedigreeFunct
 df0     <-  df[df$Outcome == "Negative", ]
 df1     <-  df[df$Outcome == "Positive", ]
 xnames  <- names(df)[! names(df) %in% c("Outcome")]
-vec_col <- ifelse(df$Outcome == "Negative", "pink", "deeppink4")
+vec_col <- ifelse(df$Outcome == "Negative", c1, c2)
 ```
 
 Now, let's take a look at some multivariate plots. We'll begin by inspecting the Parallel Coordinate Plot:
 
 ```{r, fig.dim = c(8, 4)}
 par(las = 2)
-parcoord(df[xnames], col = c("pink2", "deeppink4"))
+parcoord(df[xnames], col = c("skyblue", c2))
 legend("topright", legend = c("Negative", "Positive"),
-       col = c("pink2", "deeppink4"), lty = 1, lwd = 2)
+       col = c(c3, c4), lty = 1, lwd = 2)
 ```
 
 It seems that, overall, the positive lines are 
@@ -464,7 +484,7 @@ df1_clean <- df1[mcd_pos$mah < qchisq(0.95^(1 / n1), p), ]
 df_clean  <- rbind(df0_clean, df1_clean)
 # Re shuffle the data
 df_clean  <- df_clean[sample(seq_len(nrow(df_clean))), ]
-vec_col   <- ifelse(df_clean$Outcome == "Negative", "pink", "deeppink4")
+vec_col   <- ifelse(df_clean$Outcome == "Negative", c1, c2)
 ```
 
 ```{r, echo = FALSE}
@@ -483,8 +503,8 @@ ggpairs(df_clean, aes(color = Outcome), legend = 1,
         diag = list(continuous = "barDiag")
         ) +
     theme(legend.position = "bottom") +
-    scale_fill_manual(values = c("pink", "deeppink4")) +
-    scale_color_manual(values = c("pink", "deeppink4")) + labs(fill = "Outcome")
+    scale_fill_manual(values = c(c1, c2)) +
+    scale_color_manual(values = c(c1, c2)) + labs(fill = "Outcome")
 ```
 
 # Multivariate analysis and dimensionality reduction
@@ -523,7 +543,7 @@ colnames(df_two) <- c("x", "y", "group")
 ggplot(df_two, aes(x = x, y = y, col = group)) +
     geom_point() +
     xlab("First PC") + ylab("Second PC") + ggtitle("First two PCs") +
-    scale_colour_manual(values = c("pink", "deeppink4")) +
+    scale_colour_manual(values = c(c1, c2)) +
     theme_bw() + labs(col = "Group")
 ```
 
@@ -616,7 +636,7 @@ Let us for the following consider 4, equivalent
 to setting a threshold at $10\%$ of explained variance.
 
 ```{r, fig.size = c(8, 4)}
-fviz_eig(df_pcs, ncp = 17, addlabels = TRUE, barfill = "pink", barcolor = "deeppink4")
+fviz_eig(df_pcs, ncp = 17, addlabels = TRUE, barfill = c1, barcolor = c2)
 ```
 
 Looking at the scatterplots
@@ -664,7 +684,7 @@ par(mfrow = c(3, 3))
 sapply(colnames(z),
     function(cname) {
         hist(as.data.frame(z)[[cname]],
-             main = cname, col = "deeppink4", xlab = "")
+             main = cname, col = c2, xlab = "")
     })
 ```
 
@@ -684,7 +704,7 @@ ic_sort  <- sort(z_neg_entropy, decreasing = TRUE, index.return = TRUE)$ix
 z_ic_imp <- z[, ic_sort]
 
 par(mfrow = c(1, 1))
-plot(z_neg_entropy[ic_sort], type = "b", col = "pink", pch = 19,
+plot(z_neg_entropy[ic_sort], type = "b", col = c1, pch = 19,
      ylab = "Neg-entropy", main = "Neg-entropies",
      lwd = 3, xaxt = "n"
      )
@@ -704,7 +724,7 @@ df_temp <- data.frame(x = z_ic_imp[, 1], y = z_ic_imp[, 2], group = df_clean$Out
 ggplot(df_temp, aes(x = x, y = y, col = group)) + geom_point() +
     xlab("Third IC") + ylab("Eighth IC") +
     ggtitle("ICs with more neg-entropy") +
-    scale_colour_manual(values = c("pink", "deeppink4")) +
+    scale_colour_manual(values = c(c1, c2)) +
     theme_bw() + labs(col = "Group")
 ```
 
@@ -802,29 +822,29 @@ and the number of pregnancies, which appeared clustered on the PCA.
 
 ```{r, fig.size = c(8, 4)}
 plot(seq_along(xnames), m_vrm[, 1], pch = 19,
-    col = "pink", xlim = c(-1, 9), ylim = c(-1.1, 0.1),
+    col = c1, xlim = c(-1, 9), ylim = c(-1.1, 0.1),
     xlab = "", ylab = "Loadings",
     main = "Loadings for the first factor")
 abline(h = 0)
-text(seq_along(xnames), m_vrm[, 1], labels = xnames, pos = 1, col = "deeppink4", cex = 0.75)
+text(seq_along(xnames), m_vrm[, 1], labels = xnames, pos = 1, col = c2, cex = 0.75)
 ```
 
 ```{r, fig.size = c(8, 4)}
 plot(seq_along(xnames), m_vrm[, 2], pch = 19,
-    col = "pink", xlim = c(-1, 9), ylim = c(-0.05, 0.4),
+    col = c1, xlim = c(-1, 9), ylim = c(-0.05, 0.4),
     xlab = "", ylab = "Loadings",
     main = "Loadings for the second factor")
 abline(h = 0)
-text(seq_along(xnames), m_vrm[, 2], labels = xnames, pos = 1, col = "deeppink4", cex = 0.75)
+text(seq_along(xnames), m_vrm[, 2], labels = xnames, pos = 1, col = c2, cex = 0.75)
 ```
 
 ```{r, fig.size = c(8, 4)}
 plot(seq_along(xnames), m_vrm[, 3], pch = 19,
-    col = "pink", xlim = c(-1, 9), ylim = c(-0.1, 0.3),
+    col = c1, xlim = c(-1, 9), ylim = c(-0.1, 0.3),
     xlab = "", ylab = "Loadings",
     main = "Loadings for the third factor")
 abline(h = 0)
-text(seq_along(xnames), m_vrm[, 3], labels = xnames, pos = 1, col = "deeppink4", cex = 0.75)
+text(seq_along(xnames), m_vrm[, 3], labels = xnames, pos = 1, col = c2, cex = 0.75)
 ```
 
 ## Conclusions
@@ -859,27 +879,302 @@ we decide to keep them.
 To access the attributes: df_whatever[, xnames]
 
 To access the objective function: df_whatever$Outcome -->
-<!-- TODO: PCA -->
+
+
 <!-- definitive data: df_clean -->
 <!-- definitive attributes: df_clean[, xnames] -->
 <!-- definitive objective variable: df_clean$Outcome -->
 
-# Supervised Classification
+
+```{r, echo = F}
+y2 <- dplyr::recode(df_clean$Outcome, Negative = 0, Positive = 1)
+X2 <- as.matrix(df_sc[, xnames])
+```
+
+#  learning
+
+```{r, echo = F}
+cluster_means <- function(x, data = df_clean[,xnames], first = 1){
+  if(first == 0){
+    x <- x + 1
+  }
+  ls <- list()
+  groups_ <- sort(unique(x))
+  for (i in groups_){
+    ls[[i]] <- data[x == i,]
+  }
+  z <- sapply(ls, function(x) sapply(x, mean, na.rm = T))
+  z <- as.data.frame(z)
+  colnames(z) <- paste("Cluster", 1:length(groups_), sep = " ")
+  z2 <- z
+  return(z2)
+}
+
+cluster_classification <- function(x, y = y2, first = 1){
+  x <- x - first
+  prev <- table(x, y)
+  if(prev[1,1] + prev[2,2] > prev[1,2] + prev[2,1]){
+    f <- prev
+  } else{
+    f <- table(1-x, y)
+  }
+  dimnames(f) <- list("Pred" = c("Negative", "Positive"), "Actual" = c("Negative", "Positive"))
+  f2 <- f
+  return(f)
+}
+```
+
+## Partitional clustering
+
+### Number of clusters
+
+We'll firstly decide how many clusters we want to create. We'll use the silhoutte method and the gap statistic. The silhoutte method:
 
 ```{r}
-color_1 <- "deepskyblue2"
-color_2 <- "darkorchid4"
-color_3 <- "seagreen2"
-color_4 <- "indianred2"
+fviz_nbclust(X2, kmeans, method = "silhouette", k.max = 10)
 ```
+As we can see, this indicates that the optimum number of clusters is 2.
+
+The gap statistic:
+
+```{r, results = "hide"}
+gap_stat <- clusGap(X2, FUN = kmeans, K.max = 10, B = 100)
+```
+```{r}
+fviz_gap_stat(gap_stat, linecolor = c1, maxSE = 
+                list(method = "firstSEmax", SE.factor = 1))
+```
+This suggests that the optimum number for k is 3. However, we can see that all values of k get very similar gap statistics, so we will proceed with k = 2, as it also is the number of classes that our problem has. 
+
+### K-Means
+
+The results of k-means clustering with 2 clusters are the following: 
+
+```{r}
+kmeans_X <- kmeans(X2, centers = 2, iter.max = 1000, nstart = 100)
+
+kmeans_col <- c(c1, c2)[kmeans_X$cluster]
+plot(df_two[,1:2], col = kmeans_col, main = "First two PCs", 
+     xlab = "First PC", ylab = "Second PC", pch  = 16)
+```
+
+Let's see the average in each variable for the clusters:
+
+```{r}
+kmeans_means <- cluster_means(kmeans_X$cluster)
+kable(kmeans_means) %>% kable_styling(latex_options = "HOLD_position")
+```
+
+We can also see the confusion matrix with our target variable, although we must remember that this is not the objective of unsupervised learning.
+
+```{r}
+table_kmeans <- cluster_classification(kmeans_X$cluster, first = 1)
+kable(table_kmeans) %>% kable_styling(latex_options = "HOLD_position")
+```
+
+As we can see, the clusters are not exactly coincident with the target variable, but it does a good job (`r round((table_kmeans[1,1]+table_kmeans[2,2])/757, 2)`% accuracy).
+
+### K-Medoids
+
+As all of our attributes are numerical and we don't have any reason not to, we will use Euclidean distance.
+
+```{r}
+pam_X <- pam(X2, k = 2, metric = "euclidean", stand = FALSE)
+pam_col <- c(c1, c2)[pam_X$cluster]
+
+plot(df_two[,1:2], col = pam_col, main = "First two PCs", 
+     xlab = "First PC", ylab = "Second PC", pch = 19)
+```
+
+We obtain a very similar result than with K-Means, although they separation between groups in the first PCs is diagonal, whereas in the K-Means it was vertical. We can take a look into the averages (we do not see the medoids because they were computed with the scaled data):
+
+```{r}
+pam_means <- cluster_means(pam_X$cluster, first = 1)
+kable(pam_means) %>% kable_styling(latex_options = "HOLD_position")
+```
+Again, the confusion matrix is the following:
+
+```{r}
+kable(cluster_classification(pam_X$cluster))
+```
+Very similar results than with K-Means.
+
+### CLARA
+
+```{r}
+clara_X <- clara(X2, k = 2, metric = "euclidean", stand=FALSE)
+clara_col <- c(c1, c2)[clara_X$cluster]
+
+plot(df_two[,1:2], col = clara_col, main = "First two PCs", 
+     xlab = "First PC", ylab = "Second PC", pch = 19)
+```
+We can observe that the results are not very similar than with K-Means and K-Medoids. There are `r table(clara_X$cluster)[1]` instances in one group and `r table(clara_X$cluster)[2]` in the other. 
+
+```{r}
+clara_means <- cluster_means(clara_X$cluster, first = 1)
+kable(clara_means) %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r}
+cluster_classification(clara_X$cluster)
+```
+## Hierarchical clustering
+
+### Single linkage
+
+```{r}
+euc_dist_X <- daisy(X2, metric = "euclidean")
+single_X <- hclust(euc_dist_X, method = "single")
+plot(single_X, main = "Single linkage", cex = 0.8)
+rect.hclust(single_X, k = 2, border = c1)
+```
+
+This does not seem to yield good results. The clusters created are very, very, very small. 
+
+```{r}
+cl_single_X <- cutree(single_X, 2)
+table(cl_single_X, y2)
+```
+Only two one instance belongs to the second cluster.
+
+```{r}
+sil_single_X <- silhouette(cl_single_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_single_X)
+```
+
+### Complete linkage
+
+```{r}
+complete_X <- hclust(euc_dist_X, method = "complete")
+plot(complete_X, main = "Complete linkage", cex = 0.8)
+rect.hclust(complete_X, k = 2, border = c1)
+```
+
+```{r}
+cl_complete_X <- cutree(complete_X, 2)
+table(cl_complete_X, y2)
+```
+Now, we can see that the sizes of the clusters are much more similar, although one is twice as big as the other. 
+
+```{r}
+sil_complete_X <- silhouette(cl_complete_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_complete_X)
+```
+
+### Average linkage
+
+```{r}
+average_X <- hclust(euc_dist_X, method = "average")
+plot(average_X, main = "Average linkage", cex = 0.8)
+rect.hclust(average_X, k = 2, border = c1)
+```
+
+As with the single linkage, the clusters created by this method are very small and does not seem adequate in this case. 
+
+```{r}
+cl_average_X <- cutree(average_X, 2)
+table(cl_average_X, y2)
+```
+
+```{r}
+sil_average_X <- silhouette(cl_average_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_average_X)
+```
+
+### Ward linkage
+
+```{r}
+ward_X <- hclust(euc_dist_X, method = "ward.D")
+plot(ward_X, main = "Ward linkage", cex = 0.8)
+rect.hclust(ward_X, k = 2, border = c1)
+```
+
+```{r}
+cl_ward_X <- cutree(ward_X, 2)
+table(cl_ward_X, y2)
+```
+
+The sizes of the clusters are almost identical, and it actually resembles the groups of the target variable (`r round((table(cl_ward_X, y2)[1,1]+table(cl_ward_X, y2)[2,2]) / 757, 2)`% accuracy). 
+
+```{r}
+sil_ward_X <- silhouette(cl_ward_X, euc_dist_X)
+factoextra::fviz_silhouette(sil_ward_X)
+```
+
+## DBSCAN
+
+We fix MP to 5, and we'll see the k-distance graph to see what would be a good value for $\epsilon$.
+
+```{r}
+minPts <- 5
+kNNdistplot(X2, k = minPts - 1)
+abline(h = 1.8, col = c4)
+```
+
+```{r}
+db_fit <- dbscan(X2, eps = 1.8, minPts = 5)
+colors_db <- c(c1, c2, c3)[db_fit$cluster + 1]
+plot(df_two[,1:2], pch = 19, col = colors_db, xlab = "First PC",
+     ylab = "Second PC")
+```
+
+```{r}
+table(db_fit$cluster)
+```
+
+The clusters have very different sizes, and this is an indicator of a unique region with high data density. The averages are:
+
+```{r, echo = F}
+db_means <- cluster_means(db_fit$cluster, first = 0)
+kable(db_means) %>% kable_styling(latex_options = "HOLD_position")
+```
+
+We can also see the confusion matrix with our target variable, although we must remember that this is not the objective of unsupervised learning.
+
+```{r}
+kable(cluster_classification(db_fit$cluster, first = 0)) %>% kable_styling(latex_options = "HOLD_position")
+```
+
+## Model-based clustering
+
+```{r}
+BIC_X <- mclustBIC(X2, G = 1:5)
+plot(BIC_X)
+summary(BIC_X)
+```
+
+The suggested number of clusters is 4. However, we can see that there is not much difference between choosing 2, 3, 4 and 5. The best models are EEE (ellipsoidal, equal volume, shape and orientation) with 4 clusters, and VEE (ellipsoidal, equal shape and orientation) with 4 and 5 clusters. 
+
+```{r}
+Mclust_X <- Mclust(X2, x = BIC_X, verbose = F)
+summary(Mclust_X)
+```
+
+```{r}
+mb_means <- cluster_means(Mclust_X$classification, first = 1)
+kable(mb_means) %>% kable_styling(latex_options = "HOLD_position")
+```
+
+## Conclusions
+
+We have tried different methods for clustering our data. With the partitional methods, we have chosen two clusters and, while K-Means and K-Medoids obtain similar results, CLARA differs from them and creates clusters of unequal size. 
+
+With hierarchical clustering, we have observe that they create clusters of very unequal sizes except for the Ward and the complete methods. The Ward which would be our choice if we were to select one of them. 
+
+Model-based clustering suggested 4 as the optimum number of clusters, another evidence that suggests that the dependent variable does not condition all of the variables. 
+
+DBSCAN is not a good choice either, because all of the data seems to be grouped together and the method creates a cluster with very few instances, and another with almost all of the instances.
+
+Neither of them cluster the data into the groups that the dependent variable creates, but that makes sense as it is not its objective and our data does not appear to be separable by that. 
+
+
+# Supervised Classification
 
 We split the data into the predictors ($X$) and the variable we want to predict ($Y$):
 ```{r}
 X <- df_clean[,xnames]
 Y <- df_clean$Outcome
 ```
-
-
 
 ```{r}
 n <- nrow(X)
@@ -943,7 +1238,7 @@ table <- data.frame("Classified_as_negative" = c("True negative (TN)", "False ne
                     "Classified_as_positive" = c("False positive (FP)", "True positive (TP)"))
 rownames(table) <- c("Instances_actually_negative", "Instances_actually_positive")
 
-kable(table) %>% kable_styling(latex_options = "striped")
+kable(table) %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 With this in mind, we can also define:
 
@@ -968,7 +1263,7 @@ for (i in 3 : 20){
   LER[i] <- 1 - mean(knn_output==Y_train)
 }
 LER
-plot(1:20,LER,pch=20,col=color_1,type="b",
+plot(1:20,LER,pch=20,col=c1,type="b",
      xlab="k",ylab="LER",main="LER for the diabetes dataset")
 ```
 
@@ -989,7 +1284,7 @@ With the predictions computed, we can show the confusion matrix:
 ```{r}
 cm_knn <- confusionMatrix(table(Y_test,knn_Y_test), positive = "Positive")
 
-cm_knn$table %>% kable() %>% kable_styling(latex_options = "striped")
+cm_knn$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 Looking at some of the metrics defined earlier, we can see that the results are not great.
@@ -1034,7 +1329,7 @@ The ones in green are correctly classified, while those in red have been classif
 ```{r}
 prob_knn_Y_test <- ifelse(knn_Y_test == "Positive", attributes(knn_Y_test)$prob, 1 - attributes(knn_Y_test)$prob)
 prob <- 2*ifelse(knn_Y_test == "-1", prob_knn_Y_test, 1-prob_knn_Y_test) - 1
-colors_errors <- c(color_4,color_3)[1*(Y_test==knn_Y_test)+1]
+colors_errors <- c(c4,c3)[1*(Y_test==knn_Y_test)+1]
 plot(1:n_test,prob_knn_Y_test,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Diabetes probabilities",main="Diabetes probabilities")
 ```
@@ -1059,13 +1354,13 @@ We can see that the most important variables are *Glucose*, *LogBMI*, *LogDPF* a
 Next, we make the predictions and check the number of instances classified in group:
 ```{r}
 lr_test <- predict(lr_train,newdata=as.data.frame(X_test))
-summary(lr_test) %>% kable() %>% kable_styling(latex_options = "striped")
+summary(lr_test) %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
  
 We compute the confusion matrix:
 ```{r}
 cm_lg_default <- confusionMatrix(table(Y_test,lr_test))
-cm_lg_default$table %>% kable() %>% kable_styling(latex_options = "striped")
+cm_lg_default$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 It can be observed that the model classifies well those individuals who do not have diabetes, but has a hard time classifying those individuals who have diabetes. This is because the dataset is not balanced.
 
@@ -1098,7 +1393,7 @@ The results are not good.
 prob_lr_test <- 1 - predict(lr_train,newdata=X_test,type ="probs")
 head(prob_lr_test)
 
-colors_errors <- c(color_4,color_3)[1*(Y_test==lr_test)+1]
+colors_errors <- c(c4,c3)[1*(Y_test==lr_test)+1]
 plot(1:n_test,prob_lr_test,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of Non-Diabetes",
      main="Probabilities of Diabetes")
@@ -1138,7 +1433,7 @@ X_test_2 <- X_test[, names(model_glm$coefficients)[-1]]
 pred <- predict(model_glm, X_test_2, type="response") > 0.5
 pred <- c("Negative", "Positive")[(1*pred)+1]
 cm <- table(Y_test, pred)
-cm %>% kable() %>% kable_styling(latex_options = "striped")
+cm %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 And almost the same BAC:
@@ -1194,7 +1489,7 @@ metrics = rbind(
 rownames(metrics) = c("c = 0.10", "c = 0.50", "c = 0.90")
 colnames(metrics) = c("Accuracy", "Sensitivity", "Specificity")
 
-metrics %>% kable() %>% kable_styling(latex_options = "striped")
+metrics %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 As can be seen, with the threshold=$0.1$ we obtain a high sensitivity but a low specificity and, for the threshold=$0.9$ a low sensitivity but a low specificity. We can plot a ROC curve to search for the best threshold.
 ```{r}
@@ -1207,7 +1502,7 @@ ROC_lr = plot.roc(Y_test, test_prob,
          print.thres="best",
          print.auc=TRUE) 
 ```
-It is around $0.4$
+It is around `r round(as.numeric(rownames(ROC_lr$ci$specificity)),2)`.
 ```{r}
 ROC_lr
 ```
@@ -1220,7 +1515,7 @@ pred <- predict(model_glm, X_test_2, type = "response") >
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm_lr <- `confusionMatrix`(table(Y_test, pred), positive="Positive")
-cm_lr$table %>% kable() %>% kable_styling(latex_options = "striped")
+cm_lr$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 ```{r, echo=FALSE}
 predictors_tables[[2]] <- cm_lr
@@ -1233,11 +1528,11 @@ We can see a much better confusion matrix, and, if we compute de BAC:
 BAC <- bac(cm_lr$table)
 BAC
 ```
-It has improved a quite a bit.
+It has improved quite a bit.
 
 Finally, we plot the probability of diabetes for each instance, as well as the threshold.
 ```{r}
-colors_errors <- c(color_4,color_3)[1*(Y_test==pred)+1]
+colors_errors <- c(c4,c3)[1*(Y_test==pred)+1]
 plot(1:n_test,prob_lr_test,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of Diabetes",
      main="Probabilities of Diabetes")
@@ -1290,7 +1585,7 @@ The confusion matrix is:
 
 ```{r}
 cm_LDA <- confusionMatrix(table(Y_test,lda_Y_test), positive="Positive")
-cm_LDA$table %>% kable() %>% kable_styling(latex_options = "striped")
+cm_LDA$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 Computing the Accuracy and the TER might be interesting too.
@@ -1355,7 +1650,7 @@ pred <- predict(lda_train, X_test, type = "response")$posterior[,2] >
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm_lda_opt <- confusionMatrix(table(Y_test, pred), positive="Positive")
-cm_lda_opt$table %>% kable() %>% kable_styling(latex_options = "striped")
+cm_lda_opt$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 ```{r, echo=FALSE}
@@ -1375,7 +1670,7 @@ It is similar to the BAC computed in the logistic regression after tuning the th
 Finally, we plot the probability of being positive of diabetes and the threshold:
 ```{r}
 probs <- predict(lda_train, X_test, type = "response")$posterior[,2]
-colors_errors <- c(color_4,color_3)[1*(Y_test==pred)+1]
+colors_errors <- c(c4,c3)[1*(Y_test==pred)+1]
 plot(1:n_test,probs,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of Diabetes",
      main="Probabilities of Diabetes")
@@ -1409,7 +1704,7 @@ And the confusion table is:
 
 ```{r}
 cm_QDA <- confusionMatrix(table(Y_test,qda_Y_test), positive="Positive")
-cm_QDA$table %>% kable() %>% kable_styling(latex_options = "striped")
+cm_QDA$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 This is the same confusion table as for the default LDA! This means that accuracy, sensitivity, specificity... will be all the same.
 ```{r, echo=F}
@@ -1420,7 +1715,7 @@ Finally, we plot the probabilities of having diabetes and the default threshold.
 
 ```{r}
 probs <- predict(qda_train, X_test, type = "response")$posterior[,2]
-colors_errors <- c(color_4,color_3)[1*(Y_test==qda_Y_test)+1]
+colors_errors <- c(c4,c3)[1*(Y_test==qda_Y_test)+1]
 plot(1:n_test,probs,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of Diabetes",
      main="Probabilities of Diabetes")
@@ -1479,7 +1774,7 @@ Ploting the probabilities of diabetes for each instance:
 ```{r}
 test_prob <-  predict(nb_train, newdata = as.matrix(X_test), type = "prob")
 prob_nb_Y_test <- test_prob[,2]
-colors_errors <- c(color_4,color_3)[1*(Y_test==nb_Y_test)+1]
+colors_errors <- c(c4,c3)[1*(Y_test==nb_Y_test)+1]
 plot(1:n_test,prob_nb_Y_test,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of diabetes",
      main="Probabilities of diabetes")
@@ -1534,7 +1829,7 @@ results_table <- results_table[,-1]
 rownames(results_table) <- c("Accuracy", "Balanced Accuracy", "Sensitivity", "Specificity")
 colnames(results_table) <- c("KNN", "LR", "LDA", "QDA", "NB")
 
-results_table %>% kable() %>% kable_styling(latex_options = "striped")
+results_table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 As we were faced with an unbalanced problem, it was not enough to look at metrics such as accuracy, and we had to consult others such as balanced accuracy, sensitivity or specificity. According to these metrics, the default LR did quite poorly, but after thresholding with the help of the ROC curve, we got really good results.
@@ -1543,7 +1838,7 @@ On the other hand, and as we have commented throughout this section, Bayesian me
 
 We believe that considering what levels of sensitivity and specificity we want to obtain is especially important in medical problems (such as the one we are facing), since, for certain problems, we may be especially interested in correctly classifying positive individuals (Sensitivity), in others negative individuals (Specificity), or in others in finding a balance between them (Balanced Accuracy).
 
-
+# Conclusions
 
 
 
