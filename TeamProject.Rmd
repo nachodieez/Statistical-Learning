@@ -42,11 +42,12 @@ require(ica)
 ```
 
 ```{r, echo = F}
-c1 <- "deeppink4"
-c2 <- "skyblue2"
-c3 <- "darkorchid4"
-c4 <- "seagreen2"
-set.seed(100487766)
+c2 <- "aquamarine3"
+c3 <- "honeydew2"
+c1 <- "darkslategray"
+c4 <- "darkolivegreen"
+seed <- 42
+set.seed(seed)
 ```
 
 <!-- TODO: Introduction -->
@@ -129,7 +130,7 @@ pred_mat[,9] <- 0
 for (i in 1:8){
   pred_mat[i,i]<-0
 }
-data_im <- mice(data, m = 1, method = "pmm", predictorMatrix = pred_mat)
+data_im <- mice(data, m = 1, method = "pmm", predictorMatrix = pred_mat, seed = seed)
 data    <- complete(data_im)
 ```
 
@@ -161,16 +162,16 @@ histogram_by_groups <- function(data, var, label = NULL) {
                 y = after_stat(count / sum(count)), fill = "Positive"
                 ),
             bins = 10, colour = "white",
-            alpha = 0.5, boundary = 0, inherit.aes = FALSE) +
+            alpha = 0.65, boundary = 0, inherit.aes = FALSE) +
             theme_bw() +
             scale_fill_manual(
                 name = "",
                 breaks = c("Positive", "Negative"),
-                values = c("Positive" = c1, "Negative" = c2)
+                values = c("Positive" = c2, "Negative" = c1)
             ) +
             xlab(label) + ylab("Relative frequency") + ggtitle(label) +
-            geom_vline(xintercept = mean(data1[[var]]), colour = c1) +
-            geom_vline(xintercept = mean(data0[[var]]), colour = c2)
+            geom_vline(xintercept = mean(data1[[var]]), colour = c2) +
+            geom_vline(xintercept = mean(data0[[var]]), colour = c1)
     p + annotate(
             "text",
             x = 0.9 * max(data1[var]),
@@ -343,7 +344,7 @@ Now, let's take a look at some multivariate plots. We'll begin by inspecting the
 par(las = 2)
 parcoord(df[xnames], col = c(c1, c2))
 legend("topright", legend = c("Negative", "Positive"),
-       col = c(c3, c4), lty = 1, lwd = 2)
+       col = c(c1, c2), lty = 1, lwd = 2)
 ```
 
 It seems that, overall, the positive lines are 
@@ -542,7 +543,7 @@ df_two$group <- df_clean$Outcome
 colnames(df_two) <- c("x", "y", "group")
 
 ggplot(df_two, aes(x = x, y = y, col = group)) +
-    geom_point() +
+    geom_point(size = 1.7) +
     xlab("First PC") + ylab("Second PC") + ggtitle("First two PCs") +
     scale_colour_manual(values = c(c1, c2)) +
     theme_bw() + labs(col = "Group")
@@ -637,7 +638,7 @@ Let us for the following consider 4, equivalent
 to setting a threshold at $10\%$ of explained variance.
 
 ```{r, fig.size = c(8, 4)}
-fviz_eig(df_pcs, ncp = 17, addlabels = TRUE, barfill = c1, barcolor = c2)
+fviz_eig(df_pcs, ncp = 17, addlabels = TRUE, barfill = c1, barcolor = "white")
 ```
 
 Looking at the scatterplots
@@ -649,7 +650,7 @@ This agnosticity even seems to increment as the variance
 explained decreases, i.e. higher PCs.
 
 ```{r, fig.size = c(16, 16)}
-pairs(df_pcs$x[, 1:4], col = vec_col)
+pairs(df_pcs$x[, 1:4], col = vec_col, pch = 16)
 ```
 
 Looking at the correlations we kind of observe
@@ -827,7 +828,7 @@ plot(seq_along(xnames), m_vrm[, 1], pch = 19,
     xlab = "", ylab = "Loadings",
     main = "Loadings for the first factor")
 abline(h = 0)
-text(seq_along(xnames), m_vrm[, 1], labels = xnames, pos = 1, col = c2, cex = 0.75)
+text(seq_along(xnames), m_vrm[, 1], labels = xnames, pos = 1, col = "black", cex = 0.75)
 ```
 
 ```{r, fig.size = c(8, 4)}
@@ -836,7 +837,7 @@ plot(seq_along(xnames), m_vrm[, 2], pch = 19,
     xlab = "", ylab = "Loadings",
     main = "Loadings for the second factor")
 abline(h = 0)
-text(seq_along(xnames), m_vrm[, 2], labels = xnames, pos = 1, col = c2, cex = 0.75)
+text(seq_along(xnames), m_vrm[, 2], labels = xnames, pos = 1, col = "black", cex = 0.75)
 ```
 
 ```{r, fig.size = c(8, 4)}
@@ -845,7 +846,7 @@ plot(seq_along(xnames), m_vrm[, 3], pch = 19,
     xlab = "", ylab = "Loadings",
     main = "Loadings for the third factor")
 abline(h = 0)
-text(seq_along(xnames), m_vrm[, 3], labels = xnames, pos = 1, col = c2, cex = 0.75)
+text(seq_along(xnames), m_vrm[, 3], labels = xnames, pos = 1, col = "black", cex = 0.75)
 ```
 
 ## Conclusions
@@ -932,6 +933,7 @@ cluster_classification <- function(x, y = y2, first = 1){
 We'll firstly decide how many clusters we want to create. We'll use the silhoutte method and the gap statistic. The silhoutte method:
 
 ```{r}
+set.seed(seed)
 fviz_nbclust(X2, kmeans, method = "silhouette", k.max = 10)
 ```
 As we can see, this indicates that the optimum number of clusters is 2.
@@ -939,6 +941,7 @@ As we can see, this indicates that the optimum number of clusters is 2.
 The gap statistic:
 
 ```{r, results = "hide"}
+set.seed(seed)
 gap_stat <- clusGap(X2, FUN = kmeans, K.max = 10, B = 100)
 ```
 ```{r}
@@ -952,6 +955,7 @@ This suggests that the optimum number for k is 3. However, we can see that all v
 The results of k-means clustering with 2 clusters are the following: 
 
 ```{r}
+set.seed(42)
 kmeans_X <- kmeans(X2, centers = 2, iter.max = 1000, nstart = 100)
 
 kmeans_col <- c(c1, c2)[kmeans_X$cluster]
@@ -980,6 +984,7 @@ As we can see, the clusters are not exactly coincident with the target variable,
 As all of our attributes are numerical and we don't have any reason not to, we will use Euclidean distance.
 
 ```{r}
+set.seed(seed)
 pam_X <- pam(X2, k = 2, metric = "euclidean", stand = FALSE)
 pam_col <- c(c1, c2)[pam_X$cluster]
 
@@ -996,14 +1001,15 @@ kable(pam_means) %>% kable_styling(latex_options = "HOLD_position")
 Again, the confusion matrix is the following:
 
 ```{r}
-kable(cluster_classification(pam_X$cluster))
+kable(cluster_classification(pam_X$cluster)) %>% kable_styling(latex_options = "HOLD_position")
 ```
 Very similar results than with K-Means.
 
 ### CLARA
 
 ```{r}
-clara_X <- clara(X2, k = 2, metric = "euclidean", stand=FALSE)
+set.seed(seed)
+clara_X <- clara(X2, k = 2, metric = "euclidean", stand = FALSE)
 clara_col <- c(c1, c2)[clara_X$cluster]
 
 plot(df_two[,1:2], col = clara_col, main = "First two PCs", 
@@ -1017,13 +1023,14 @@ kable(clara_means) %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 ```{r}
-cluster_classification(clara_X$cluster)
+kable(cluster_classification(clara_X$cluster))  %>% kable_styling(latex_options = "HOLD_position")
 ```
 ## Hierarchical clustering
 
 ### Single linkage
 
 ```{r}
+set.seed(seed)
 euc_dist_X <- daisy(X2, metric = "euclidean")
 single_X <- hclust(euc_dist_X, method = "single")
 plot(single_X, main = "Single linkage", cex = 0.8)
