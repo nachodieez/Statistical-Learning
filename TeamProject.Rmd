@@ -43,9 +43,10 @@ require(ica)
 
 ```{r, echo = F}
 c1 <- "deeppink4"
-c2 <- "gold2"
+c2 <- "skyblue2"
 c3 <- "darkorchid4"
 c4 <- "seagreen2"
+set.seed(100487766)
 ```
 
 <!-- TODO: Introduction -->
@@ -340,7 +341,7 @@ Now, let's take a look at some multivariate plots. We'll begin by inspecting the
 
 ```{r, fig.dim = c(8, 4)}
 par(las = 2)
-parcoord(df[xnames], col = c("skyblue", c2))
+parcoord(df[xnames], col = c(c1, c2))
 legend("topright", legend = c("Negative", "Positive"),
        col = c(c3, c4), lty = 1, lwd = 2)
 ```
@@ -891,7 +892,7 @@ y2 <- dplyr::recode(df_clean$Outcome, Negative = 0, Positive = 1)
 X2 <- as.matrix(df_sc[, xnames])
 ```
 
-#  learning
+# Unsupervised Learning
 
 ```{r, echo = F}
 cluster_means <- function(x, data = df_clean[,xnames], first = 1){
