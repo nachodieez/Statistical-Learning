@@ -977,7 +977,7 @@ table_kmeans <- cluster_classification(kmeans_X$cluster, first = 1)
 kable(table_kmeans) %>% kable_styling(latex_options = "HOLD_position")
 ```
 
-As we can see, the clusters are not exactly coincident with the target variable, but it does a good job (`r round((table_kmeans[1,1]+table_kmeans[2,2])/757, 2)`% accuracy).
+As we can see, the clusters are not exactly coincident with the target variable, but it does a good job. It achieves `r round((table_kmeans[1,1]+table_kmeans[2,2])/7.57, 2)`% accuracy. Let us remember that accuracy is defined as the proportion of instances correctly classified. We can also define $TER$ (test error rate) as 1 - $\text{accuracy}$.
 
 ### K-Medoids
 
@@ -1041,7 +1041,7 @@ This does not seem to yield good results. The clusters created are very, very, v
 
 ```{r}
 cl_single_X <- cutree(single_X, 2)
-table(cl_single_X, y2)
+kable(cluster_classification(cl_single_X))  %>% kable_styling(latex_options = "HOLD_position")
 ```
 Only two one instance belongs to the second cluster.
 
@@ -1060,7 +1060,7 @@ rect.hclust(complete_X, k = 2, border = c1)
 
 ```{r}
 cl_complete_X <- cutree(complete_X, 2)
-table(cl_complete_X, y2)
+kable(cluster_classification(cl_complete_X))  %>% kable_styling(latex_options = "HOLD_position")
 ```
 Now, we can see that the sizes of the clusters are much more similar, although one is twice as big as the other. 
 
@@ -1081,7 +1081,7 @@ As with the single linkage, the clusters created by this method are very small a
 
 ```{r}
 cl_average_X <- cutree(average_X, 2)
-table(cl_average_X, y2)
+kable(cluster_classification(cl_average_X))  %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 ```{r}
@@ -1099,7 +1099,7 @@ rect.hclust(ward_X, k = 2, border = c1)
 
 ```{r}
 cl_ward_X <- cutree(ward_X, 2)
-table(cl_ward_X, y2)
+kable(cluster_classification(cl_ward_X))  %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 The sizes of the clusters are almost identical, and it actually resembles the groups of the target variable (`r round((table(cl_ward_X, y2)[1,1]+table(cl_ward_X, y2)[2,2]) / 757, 2)`% accuracy). 
@@ -1137,7 +1137,7 @@ db_means <- cluster_means(db_fit$cluster, first = 0)
 kable(db_means) %>% kable_styling(latex_options = "HOLD_position")
 ```
 
-We can also see the confusion matrix with our target variable, although we must remember that this is not the objective of unsupervised learning.
+We can also see the confusion matrix:
 
 ```{r}
 kable(cluster_classification(db_fit$cluster, first = 0)) %>% kable_styling(latex_options = "HOLD_position")
@@ -1146,6 +1146,7 @@ kable(cluster_classification(db_fit$cluster, first = 0)) %>% kable_styling(latex
 ## Model-based clustering
 
 ```{r}
+set.seed(seed)
 BIC_X <- mclustBIC(X2, G = 1:5)
 plot(BIC_X)
 summary(BIC_X)
