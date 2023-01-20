@@ -1421,7 +1421,7 @@ summary(lr_test) %>% kable() %>% kable_styling(latex_options = "striped") %>%
  
 We compute the confusion matrix:
 ```{r}
-cm_lg_default <- confusionMatrix(table(lr_test,Y_test))
+cm_lg_default <- confusionMatrix(table(lr_test,Y_test), positive = "Positive")
 cm_lg_default$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
 ```
