@@ -1294,22 +1294,20 @@ As the problem is unbalanced, we want to define some key concepts before startin
 The confusion matrix is defined as:
 
 ```{r, echo=FALSE}
-table <- data.frame("Classified_as_negative" = c("True negative (TN)", "False negative (FN)"),
-                    "Classified_as_positive" = c("False positive (FP)", "True positive (TP)"))
-rownames(table) <- c("Instances_actually_negative", "Instances_actually_positive")
+table <- data.frame("Instances_actually_negative" = c("True negative (TN)", "False positive (FP)"),
+                    "Instances_actually_positive" = c("False negative (FN)", "True positive (TP)"))
+rownames(table) <- c("Classified_as_negative", "Classified_as_positive")
 
 kable(table) %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
 ```
 With this in mind, we can also define:
 
-- $TPR=TP/(TP+FN)$ (True Positive Rate i.e. Sensitivity)
-- $FNR=FN/(TP+FN)$ (False Negative Rate)
-- $FPR=FP/(FP+TN)$ (False Positive Rate)
-- $TNR=TN/(FP+TN)$ (True Negative Rate i.e Specificity)
+- $\text{Sensitivity}=TP/(TP+FN)$ | (True Positive Rate)
+- $\text{Specificity}=TN/(FP+TN)$ | (True Negative Rate)
 - $\text{Accuracy}=(TP+TN)/(TP+TN+FP+FN)$
-- $\text{TER} = (FP+FN)/(TP+TN+FP+FN) = 1 - \text{Accuracy}$ (Text Error Rate)
-- $BAC=(TPR+TNR)/2$ (Balanced Accuracy)
+- $\text{TER} = (FP+FN)/(TP+TN+FP+FN) = 1 - \text{Accuracy}$ | (Test Error Rate)
+- $BAC=(TPR+TNR)/2$ | (Balanced Accuracy)
 
 ## K-Nearest Neighbors (KNN)
 
@@ -1343,7 +1341,7 @@ knn_Y_test <- knn(X_train,X_test,Y_train,k=k,prob=T)
 
 With the predictions computed, we can show the confusion matrix:
 ```{r}
-cm_knn <- confusionMatrix(table(Y_test,knn_Y_test), positive = "Positive")
+cm_knn <- confusionMatrix(table(knn_Y_test,Y_test), positive = "Positive")
 
 cm_knn$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
@@ -1368,7 +1366,7 @@ knn_TER
 Given a confusion matrix, we can also compute the BAC. First, we define the following function:
 ```{r}
 bac <- function(cm){
-  return((cm[1,1]/(cm[1,1] + cm[1,2]) + (cm[2,2]/(cm[2,1] + cm[2,2])))/2)
+  return((cm[1,1]/(cm[1,1] + cm[2,1]) + (cm[2,2]/(cm[1,2] + cm[2,2])))/2)
 }
 ```
 
@@ -1392,7 +1390,7 @@ The ones in green are correctly classified, while those in red have been classif
 prob_knn_Y_test <- ifelse(knn_Y_test == "Positive",
     attributes(knn_Y_test)$prob, 1 - attributes(knn_Y_test)$prob)
 prob <- 2*ifelse(knn_Y_test == "-1", prob_knn_Y_test, 1-prob_knn_Y_test) - 1
-colors_errors <- c(c4,c3)[1*(Y_test==knn_Y_test)+1]
+colors_errors <- c("indianred2", "seagreen2")[1*(Y_test==knn_Y_test)+1]
 plot(1:n_test,prob_knn_Y_test,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Diabetes probabilities",main="Diabetes probabilities")
 ```
@@ -1423,7 +1421,7 @@ summary(lr_test) %>% kable() %>% kable_styling(latex_options = "striped") %>%
  
 We compute the confusion matrix:
 ```{r}
-cm_lg_default <- confusionMatrix(table(Y_test,lr_test))
+cm_lg_default <- confusionMatrix(table(lr_test,Y_test))
 cm_lg_default$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
 ```
@@ -1458,7 +1456,7 @@ The results are not good.
 prob_lr_test <- 1 - predict(lr_train,newdata=X_test,type ="probs")
 head(prob_lr_test)
 
-colors_errors <- c(c4,c3)[1*(Y_test==lr_test)+1]
+colors_errors <- c("indianred2", "seagreen2")[1*(Y_test==lr_test)+1]
 plot(1:n_test,prob_lr_test,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of Non-Diabetes",
      main="Probabilities of Diabetes")
@@ -1468,12 +1466,8 @@ abline(h=0.5)
 We are not happy with the performance of the model so we are going to try to improve it.
 
 In order to try to improve it, we are going to first do stepwise model selection. 
-The information criterion that we are going to use in order to evaluate the measure the performance of the model is the *Bayesian Information Criterion* (BIC), and it is defined as
-
-$$
-BIC = -2l(model)+npar(model)\cdot\log(n)
-$$
-and it aims to balance the model complexity and fitness. We do the stepwide model selection:
+The information criterion that we are going to use in order to evaluate the measure the performance of the model is the *Bayesian Information Criterion* (BIC),
+and it aims to balance the model complexity and fitness. We do the stepwise model selection:
 
 ```{r}
 ### BIC
@@ -1498,17 +1492,22 @@ X_test_2 <- X_test[, names(model_glm$coefficients)[-1]]
 
 pred <- predict(model_glm, X_test_2, type="response") > 0.5
 pred <- c("Negative", "Positive")[(1*pred)+1]
-cm <- table(Y_test, pred)
-cm %>% kable() %>% kable_styling(latex_options = "striped") %>%
+cm_lr <- confusionMatrix(table(pred,Y_test))
+cm_lr$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
 ```
 
 And almost the same BAC:
 
 ```{r}
-BAC <- bac(cm)
+BAC <- bac(cm_lr$table)
 BAC
 ```
+
+```{r, echo=FALSE}
+predictors_tables[[2]] <- cm_lr
+```
+
 
 As the logistic regression is a scoring classifier (i.e. a classifier that predicts a real value representing the probability that the instance belongs to a certain class, in our case, to be positive in diabetes) we can choose the threshold we can define the threshold at which we decide that the instance is considered to be positive for diabetes. Until now, we have been using $0.5$ as the threshold.
 
@@ -1582,26 +1581,26 @@ pred <- predict(model_glm, X_test_2, type = "response") >
   as.numeric(rownames(ROC_lr$ci$specificity))
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
-cm_lr <- `confusionMatrix`(table(Y_test, pred), positive="Positive")
-cm_lr$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
+cm_lr_opt <- confusionMatrix(table(pred,Y_test), positive="Positive")
+cm_lr_opt$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
 ```
 ```{r, echo=FALSE}
-predictors_tables[[2]] <- cm_lr
+predictors_tables[[3]] <- cm_lr_opt
 ```
 
 
 We can see a much better confusion matrix, and, if we compute de BAC:
 
 ```{r}
-BAC <- bac(cm_lr$table)
+BAC <- bac(cm_lr_opt$table)
 BAC
 ```
 It has improved quite a bit.
 
 Finally, we plot the probability of diabetes for each instance, as well as the threshold.
 ```{r}
-colors_errors <- c(c4,c3)[1*(Y_test==pred)+1]
+colors_errors <- c("indianred2", "seagreen2")[1*(Y_test==pred)+1]
 plot(1:n_test,prob_lr_test,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of Diabetes",
      main="Probabilities of Diabetes")
@@ -1653,9 +1652,13 @@ lda_Y_test <- lda_test$class
 The confusion matrix is:
 
 ```{r}
-cm_LDA <- confusionMatrix(table(Y_test,lda_Y_test), positive="Positive")
+cm_LDA <- confusionMatrix(table(lda_Y_test,Y_test), positive="Positive")
 cm_LDA$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, echo=FALSE}
+predictors_tables[[4]] <- cm_LDA
 ```
 
 Computing the Accuracy and the TER might be interesting too.
@@ -1719,12 +1722,12 @@ pred <- predict(lda_train, X_test, type = "response")$posterior[,2] >
   as.numeric(rownames(ROC_lda$ci$specificity))
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
-cm_lda_opt <- confusionMatrix(table(Y_test, pred), positive="Positive")
+cm_lda_opt <- confusionMatrix(table(pred,Y_test), positive="Positive")
 cm_lda_opt$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 ```{r, echo=FALSE}
-predictors_tables[[3]] <- cm_lda_opt
+predictors_tables[[5]] <- cm_lda_opt
 ```
 
 
@@ -1740,7 +1743,7 @@ It is similar to the BAC computed in the logistic regression after tuning the th
 Finally, we plot the probability of being positive of diabetes and the threshold:
 ```{r}
 probs <- predict(lda_train, X_test, type = "response")$posterior[,2]
-colors_errors <- c(c4,c3)[1*(Y_test==pred)+1]
+colors_errors <- c("indianred2", "seagreen2")[1*(Y_test==pred)+1]
 plot(1:n_test,probs,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of Diabetes",
      main="Probabilities of Diabetes")
@@ -1773,24 +1776,90 @@ qda_Y_test <- qda_test$class
 And the confusion table is:
 
 ```{r}
-cm_QDA <- confusionMatrix(table(Y_test,qda_Y_test), positive="Positive")
+cm_QDA <- confusionMatrix(table(qda_Y_test,Y_test), positive="Positive")
 cm_QDA$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 This is the same confusion table as for the default LDA! This means that accuracy, sensitivity, specificity... will be all the same.
 ```{r, echo=F}
-predictors_tables[[4]] <- cm_QDA
+predictors_tables[[6]] <- cm_QDA
 ```
 
 Finally, we plot the probabilities of having diabetes and the default threshold.
 
 ```{r}
 probs <- predict(qda_train, X_test, type = "response")$posterior[,2]
-colors_errors <- c(c4,c3)[1*(Y_test==qda_Y_test)+1]
+colors_errors <- c("indianred2", "seagreen2")[1*(Y_test==qda_Y_test)+1]
 plot(1:n_test,probs,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of Diabetes",
      main="Probabilities of Diabetes")
 abline(h=0.5)
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+test_prob = predict(qda_train, newdata = X_test, type = "response")
+test_prob <- test_prob$posterior[,2]
+
+ROC_qda = plot.roc(Y_test, test_prob,
+               main="Confidence interval of a threshold", percent=TRUE,
+               ci=TRUE, of="thresholds", 
+               thresholds="best", 
+               print.thres="best",
+               print.auc=TRUE) 
+```
+
+According to the ROC curve, the optimum threshold is:
+```{r}
+as.numeric(rownames(ROC_qda$ci$specificity))
+```
+
+
+If we compute the predictions with the new threshold:
+
+```{r}
+pred <- predict(qda_train, X_test, type = "response")$posterior[,2] > 
+  as.numeric(rownames(ROC_lda$ci$specificity))
+pred <- pred * 1
+pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
+cm_qda_opt <- confusionMatrix(table(pred,Y_test), positive="Positive")
+cm_qda_opt$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+```{r, echo=FALSE}
+predictors_tables[[7]] <- cm_qda_opt
+```
+
+
+We can also compute the BAC:
+
+```{r}
+BAC <- bac(cm_qda_opt$table)
+BAC
+```
+
+It is similar to the BAC computed in the logistic regression after tuning the threshold.
+
+Finally, we plot the probability of being positive of diabetes and the threshold:
+```{r}
+probs <- predict(qda_train, X_test, type = "response")$posterior[,2]
+colors_errors <- c("indianred2", "seagreen2")[1*(Y_test==pred)+1]
+plot(1:n_test,probs,col=colors_errors,pch=20,type="p",
+     xlab="Test sample",ylab="Probabilities of Diabetes",
+     main="Probabilities of Diabetes")
+abline(h=as.numeric(rownames(ROC_lda$ci$specificity)))
+```
+
 
 
 
@@ -1816,11 +1885,11 @@ nb_Y_test <- as.factor(ifelse(nb_test[,2]>0.5, "Positive", "Negative"))
 By computing the confusion matrix, we can see that the method yields good results:
 
 ```{r}
-cm_nb <- confusionMatrix(table(Y_test,nb_Y_test), positive = "Positive")
+cm_nb <- confusionMatrix(table(nb_Y_test,Y_test), positive = "Positive")
 cm_nb$table
 ```
 ```{r, echo=FALSE}
-predictors_tables[[5]] <- cm_nb
+predictors_tables[[8]] <- cm_nb
 ```
 
 It may be interesting to compute TER, accuracy, sensitivity, specificity...
@@ -1844,7 +1913,7 @@ Ploting the probabilities of diabetes for each instance:
 ```{r}
 test_prob <-  predict(nb_train, newdata = as.matrix(X_test), type = "prob")
 prob_nb_Y_test <- test_prob[,2]
-colors_errors <- c(c4,c3)[1*(Y_test==nb_Y_test)+1]
+colors_errors <- c("indianred2", "seagreen2")[1*(Y_test==nb_Y_test)+1]
 plot(1:n_test,prob_nb_Y_test,col=colors_errors,pch=20,type="p",
      xlab="Test sample",ylab="Probabilities of diabetes",
      main="Probabilities of diabetes")
@@ -1871,35 +1940,79 @@ cm_nb_tuned$table
 ```
 -->
 
+According to the ROC curve, the optimum threshold is:
+```{r}
+as.numeric(rownames(ROC_nb$ci$specificity))
+```
+
+
+If we compute the predictions with the new threshold:
+
+```{r}
+pred <- predict(nb_train, as.matrix(X_test), type = "prob")[,2] > 
+  as.numeric(rownames(ROC_lda$ci$specificity))
+pred <- pred * 1
+pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
+cm_nb_opt <- confusionMatrix(table(pred,Y_test), positive="Positive")
+cm_nb_opt$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+
+```{r, echo=FALSE}
+predictors_tables[[9]] <- cm_nb_opt
+```
+
+
+We can also compute the BAC:
+
+```{r}
+BAC <- bac(cm_nb_opt$table)
+BAC
+```
+
+It is similar to the BAC computed in the logistic regression after tuning the threshold.
+
+Finally, we plot the probability of being positive of diabetes and the threshold:
+```{r}
+probs <- predict(nb_train, as.matrix(X_test), type = "prob")[,2]
+colors_errors <- c("indianred2", "seagreen2")[1*(Y_test==pred)+1]
+plot(1:n_test,probs,col=colors_errors,pch=20,type="p",
+     xlab="Test sample",ylab="Probabilities of Diabetes",
+     main="Probabilities of Diabetes")
+abline(h=as.numeric(rownames(ROC_lda$ci$specificity)))
+```
+
+
+
 
 
 ## Conclusions of the section
 
 We have tried five different supervised classification methods:
 
+- K-Nearest Neighbors (KNN)
 - Logistic regression (LR)
 - Linear discriminant analysis (LDA)
 - Quadratic discriminant analysis (QDA)
 - Naive Bayes (NB)
-- K-Nearest Neighbors (KNN)
 
 The results of the best classifier obtained for each of the methods can be seen in the following table:
 
 ```{r}
 results_table <- data.frame(x=c(0,0,0,0))
 for(i in 1:length(predictors_tables)){
-  v <- c(predictors_tables[[i]]$overall["Accuracy"],
-         bac(predictors_tables[[i]]$table),
-         predictors_tables[[i]]$byClass["Sensitivity"],
-         predictors_tables[[i]]$byClass["Specificity"]
+  v <- c(round(predictors_tables[[i]]$overall["Accuracy"],4),
+         round(bac(predictors_tables[[i]]$table),4),
+         round(predictors_tables[[i]]$byClass["Sensitivity"],4),
+         round(predictors_tables[[i]]$byClass["Specificity"],4)
          )
   results_table <- cbind(results_table, v)
 }
 results_table <- results_table[,-1]
-rownames(results_table) <- c("Accuracy", "Balanced Accuracy", "Sensitivity", "Specificity")
-colnames(results_table) <- c("KNN", "LR", "LDA", "QDA", "NB")
+rownames(results_table) <- c("Accuracy", "BAC", "Sensitivity", "Specificity")
+colnames(results_table) <- c("KNN", "LR","LR_roc", "LDA","LDA_roc", "QDA","QDA_roc", "NB", "NB_roc")
 
-results_table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+results_table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position", full_width = F)
 ```
 
 As we were faced with an unbalanced problem, it was not enough to look at metrics such as accuracy, and we had to consult others such as balanced accuracy, sensitivity or specificity. According to these metrics, the default LR did quite poorly, but after thresholding with the help of the ROC curve, we got really good results.
