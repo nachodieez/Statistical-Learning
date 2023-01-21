@@ -1227,7 +1227,7 @@ DBSCAN is not a good choice either, because all of the data seems to be grouped 
 
 Neither of them cluster the data into the groups that the dependent variable creates, but that makes sense as it is not its objective and our data does not appear to be separable by that. 
 
-
+\newpage
 # Supervised Classification
 
 We split the data into the predictors ($X$) and the variable we want to predict ($Y$):
@@ -1301,7 +1301,7 @@ rownames(table) <- c("Classified_as_negative", "Classified_as_positive")
 kable(table) %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
 ```
-With this in mind, we can also define:
+With this in mind, we can also define some important metrics for inbalanced problems:
 
 - $\text{Sensitivity}=TP/(TP+FN)$ | (True Positive Rate)
 - $\text{Specificity}=TN/(FP+TN)$ | (True Negative Rate)
@@ -1324,14 +1324,10 @@ for (i in 3 : 20){
 LER
 plot(1:20,LER,pch=20,col=c1,type="b",
      xlab="k",ylab="LER",main="LER for the diabetes dataset")
-```
-
-It seems that the optimal $K$ is
-
-```{r}
 k <- which.min(LER)
-k
 ```
+
+It seems that the optimal $K$ is `r k`.
 
 Now, with the K selected, we can now compute the predictions for the testing partition.
 
@@ -1339,7 +1335,7 @@ Now, with the K selected, we can now compute the predictions for the testing par
 knn_Y_test <- knn(X_train,X_test,Y_train,k=k,prob=T)
 ```
 
-With the predictions computed, we can show the confusion matrix:
+And, with the predictions computed, we can show the confusion matrix:
 ```{r}
 cm_knn <- confusionMatrix(table(knn_Y_test,Y_test), positive = "Positive")
 
@@ -1398,7 +1394,7 @@ plot(1:n_test,prob_knn_Y_test,col=colors_errors,pch=20,type="p",
 
 ## Logistic Regression
 
-Next, we are going to test is logistic regression. We start by training the model and checking the summary:
+Next, we are going to test is logistic regression. We start by training the model and checking its summary:
 ```{r}
 lr_train <- multinom(Y_train~.,data=X_train)
 summary(lr_train)
@@ -1425,7 +1421,7 @@ cm_lg_default <- confusionMatrix(table(lr_test,Y_test), positive = "Positive")
 cm_lg_default$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
 ```
-It can be observed that the model classifies well those individuals who do not have diabetes, but has a hard time classifying those individuals who have diabetes. This is because the dataset is not balanced.
+It can be observed that the model classifies well those individuals who do not have diabetes, but has a hard time classifying those individuals who have diabetes. This probably is because the problem is inbalanced.
 
 Now, we compute both the TER and the accuracy:
 
@@ -1492,7 +1488,7 @@ X_test_2 <- X_test[, names(model_glm$coefficients)[-1]]
 
 pred <- predict(model_glm, X_test_2, type="response") > 0.5
 pred <- c("Negative", "Positive")[(1*pred)+1]
-cm_lr <- confusionMatrix(table(pred,Y_test))
+cm_lr <- confusionMatrix(table(pred,Y_test), positive = "Positive")
 cm_lr$table %>% kable() %>% kable_styling(latex_options = "striped") %>%
     kable_styling(latex_options = "HOLD_position")
 ```
@@ -1669,13 +1665,14 @@ lda_TER
 lda_accuracy <- 1 - lda_TER
 lda_accuracy
 ```
-If we compute the BAC we can see that it is much better than the default logistic regression. 
+If we compute the BAC we can see that it is about the same as the default logistic regression.
 
 ```{r}
 bac(cm_LDA$table)
 ```
 
-The reason behind this is that, as said earlier, due to its bayesian nature, it takes into account that the problem is unbalanced.
+Despite its bayesian nature, the sample size is probably too small for this to really have a real impact when taking into account the unbalanced problem.
+
 If we compute its sensitivity and specificity:
 
 ```{r}
@@ -1796,16 +1793,7 @@ abline(h=0.5)
 ```
 
 
-
-
-
-
-
-
-
-
-
-
+We compute the ROC curve:
 
 ```{r}
 test_prob = predict(qda_train, newdata = X_test, type = "response")
@@ -1819,11 +1807,7 @@ ROC_qda = plot.roc(Y_test, test_prob,
                print.auc=TRUE) 
 ```
 
-According to the ROC curve, the optimum threshold is:
-```{r}
-as.numeric(rownames(ROC_qda$ci$specificity))
-```
-
+According to the ROC curve, the optimum threshold is about `r as.numeric(rownames(ROC_qda$ci$specificity))`.
 
 If we compute the predictions with the new threshold:
 
@@ -1835,6 +1819,8 @@ pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm_qda_opt <- confusionMatrix(table(pred,Y_test), positive="Positive")
 cm_qda_opt$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
+
+We can see a better confusion matrix.
 
 ```{r, echo=FALSE}
 predictors_tables[[7]] <- cm_qda_opt
@@ -1903,12 +1889,12 @@ cm_nb$byClass["Sensitivity"]
 cm_nb$byClass["Specificity"]
 ```
 
-The results are good, specially for the specificity. We can also compute the BAC:
+The results are good but nothing unbeliable. We can also compute the BAC:
 
 ```{r}
 bac(cm_nb$table)
 ```
-The BAC is also as good as the accuracy.
+The BAC is similar to the accuracy.
 Ploting the probabilities of diabetes for each instance:
 ```{r}
 test_prob <-  predict(nb_train, newdata = as.matrix(X_test), type = "prob")
@@ -1940,13 +1926,10 @@ cm_nb_tuned$table
 ```
 -->
 
-According to the ROC curve, the optimum threshold is:
-```{r}
-as.numeric(rownames(ROC_nb$ci$specificity))
-```
+According to the ROC curve, the optimum threshold is `r as.numeric(rownames(ROC_nb$ci$specificity))`
 
 
-If we compute the predictions with the new threshold:
+We compute the predictions with the new threshold:
 
 ```{r}
 pred <- predict(nb_train, as.matrix(X_test), type = "prob")[,2] > 
@@ -1970,7 +1953,7 @@ BAC <- bac(cm_nb_opt$table)
 BAC
 ```
 
-It is similar to the BAC computed in the logistic regression after tuning the threshold.
+It is lower than the BAC computed for the logistic regression after tuning the threshold.
 
 Finally, we plot the probability of being positive of diabetes and the threshold:
 ```{r}
@@ -2017,9 +2000,9 @@ results_table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable
 
 As we were faced with an unbalanced problem, it was not enough to look at metrics such as accuracy, and we had to consult others such as balanced accuracy, sensitivity or specificity. According to these metrics, the default LR did quite poorly, but after thresholding with the help of the ROC curve, we got really good results.
 
-On the other hand, and as we have commented throughout this section, Bayesian methods have the advantage in this type of problem that they take into account the a priori probability, so that by default they already consider that the problem is unbalanced. Thanks to this, they achieve very good results by default, but, depending on the levels of sensitivity and specificity to be achieved, it may be a good idea to perform thresholding.
+On the other hand, and as we have commented throughout this section, Bayesian methods have the advantage in this type of problem that they take into account the prior probability, so that by default they already consider that the problem is unbalanced. However, and perhaps due to the small sample size, they have not been particularly superior to the rest by default.
 
-We believe that considering what levels of sensitivity and specificity we want to obtain is especially important in medical problems (such as the one we are facing), since, for certain problems, we may be especially interested in correctly classifying positive individuals (Sensitivity), in others negative individuals (Specificity), or in others in finding a balance between them (Balanced Accuracy).
+Finally, we believe that considering what levels of sensitivity and specificity we want to obtain is especially important in medical problems (such as the one we are facing), since, for certain problems, we may be especially interested in correctly classifying positive individuals (Sensitivity), in others negative individuals (Specificity), or in others in finding a balance between them (Balanced Accuracy).
 
 # Conclusions
 

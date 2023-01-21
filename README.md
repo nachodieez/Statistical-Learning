@@ -6,12 +6,12 @@
 
 - [ ] Revisar código que no entra en pantalla
 
-- [ ] Quitar definición BIC
+- [x] Quitar definición BIC
 
 - [x] Añadir Accuracy y TER en parte de Pablo
 
-- [ ] Revisar si se puede usar kable en matrices de covarianza
+- [ ] Revisar todas las tablas que podemos mostrar con kable
 
 - [ ] Conclusiones redactadas
 
-- [ ] Introducción
+- [x] Introducción
