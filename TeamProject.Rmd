@@ -1057,7 +1057,7 @@ clara_col <- c(c1, c2)[clara_X$cluster]
 plot(df_two[,1:2], col = clara_col, main = "First two PCs", 
      xlab = "First PC", ylab = "Second PC", pch = 19)
 ```
-We can observe that the results are not very similar than with K-Means and K-Medoids. There are `r table(clara_X$cluster)[1]` instances in one group and `r table(clara_X$cluster)[2]` in the other. 
+We can observe that the results are not so similar than with K-Means and K-Medoids. There are `r table(clara_X$cluster)[1]` instances in one group and `r table(clara_X$cluster)[2]` in the other. 
 
 ```{r}
 clara_means <- cluster_means(clara_X$cluster, first = 1)
@@ -1085,7 +1085,7 @@ This does not seem to yield good results. The clusters created are very, very, v
 cl_single_X <- cutree(single_X, 2)
 kable(cluster_classification(cl_single_X))  %>% kable_styling(latex_options = "HOLD_position")
 ```
-Only two one instance belongs to the second cluster.
+Only one instance belongs to the second cluster.
 
 ```{r}
 sil_single_X <- silhouette(cl_single_X, euc_dist_X)
@@ -1105,7 +1105,7 @@ cl_complete_X <- cutree(complete_X, 2)
 kable(cluster_classification(cl_complete_X))  %>%
     kable_styling(latex_options = "HOLD_position")
 ```
-Now, we can see that the sizes of the clusters are much more similar, although one is twice as big as the other. 
+Now, we can see that the sizes of the clusters are much more similar, although one is twice as big as the other. This is a better way of clustering our data than with single linkage.
 
 ```{r}
 sil_complete_X <- silhouette(cl_complete_X, euc_dist_X)
@@ -1145,7 +1145,7 @@ cl_ward_X <- cutree(ward_X, 2)
 kable(cluster_classification(cl_ward_X))  %>% kable_styling(latex_options = "HOLD_position")
 ```
 
-The sizes of the clusters are almost identical, and it actually resembles the groups of the target variable (`r round((table(cl_ward_X, y2)[1,1]+table(cl_ward_X, y2)[2,2]) / 757, 2)`% accuracy). 
+The sizes of the clusters are almost identical, and it resembles mildly the groups of the target variable (`r round((table(cl_ward_X, y2)[1,1]+table(cl_ward_X, y2)[2,2]) / 757, 2)`% accuracy). 
 
 ```{r}
 sil_ward_X <- silhouette(cl_ward_X, euc_dist_X)
@@ -1208,7 +1208,7 @@ colors_db <- c("green", "red", "orange", "blue")[Mclust_X$classification]
 plot(df_two[,1:2], pch = 19, col = colors_db, xlab = "First PC",
      ylab = "Second PC")
 ```
-There is significant overlap between the clusters. 
+There is significant overlap between the clusters, and it is curious that the separation is not vertical. This suggests that the way of clustering the data is not doing so by the groups created by the target variable.
 
 ```{r}
 mb_means <- cluster_means(Mclust_X$classification, first = 1)
@@ -1218,7 +1218,6 @@ kable(mb_means) %>% kable_styling(latex_options = "HOLD_position")
 ## Conclusions
 
 We have tried different methods for clustering our data. With the partitional methods, we have chosen two clusters and, while K-Means and K-Medoids obtain similar results, CLARA differs from them and creates clusters of unequal size. 
-
 With hierarchical clustering, we have observe that they create clusters of very unequal sizes except for the Ward and the complete methods. The Ward which would be our choice if we were to select one of them. 
 
 Model-based clustering suggested 4 as the optimum number of clusters, another evidence that suggests that the dependent variable does not condition all of the variables. 
@@ -1226,6 +1225,8 @@ Model-based clustering suggested 4 as the optimum number of clusters, another ev
 DBSCAN is not a good choice either, because all of the data seems to be grouped together and the method creates a cluster with very few instances, and another with almost all of the instances.
 
 Neither of them cluster the data into the groups that the dependent variable creates, but that makes sense as it is not its objective and our data does not appear to be separable by that. 
+
+If we were to choose only one technique, we would go with K-Means or K-Medoids as we know beforehand that there are two groups in the data, which makes partitional clustering a good choice. 
 
 \newpage
 # Supervised Classification
