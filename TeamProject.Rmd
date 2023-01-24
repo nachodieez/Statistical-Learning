@@ -447,8 +447,8 @@ mcd_est <- CovMcd(df[xnames], alpha = 0.85, nsamp = "deterministic")
 print("The mean vector is:")
 print(mcd_est$center)
 print("The covariance matrix is:")
-m_cov <- round(mcd_est$cov, 2)
-kable(m_cov)
+m_cov <- round(mcd_est$cov, 4)
+m_cov
 ```
 
 ```{r, fig.size = c(8, 8)}
@@ -469,8 +469,8 @@ mcd_pos <- CovMcd(df1[xnames], alpha = 0.85, nsamp = "deterministic")
 print("### Negative class ###")
 print("The mean vector is:")
 print(mcd_neg$center)
-m_cov_neg <- round(mcd_neg$cov, 2)
-kable(m_cov_neg)
+m_cov_neg <- round(mcd_neg$cov, 4)
+m_cov_neg
 ```
 
 ```{r, fig.size = c(8, 8)}
@@ -1124,7 +1124,8 @@ As with the single linkage, the clusters created by this method are very small a
 
 ```{r}
 cl_average_X <- cutree(average_X, 2)
-kable(cluster_classification(cl_average_X))  %>% kable_styling(latex_options = "HOLD_position")
+kable(cluster_classification(cl_average_X))  %>%
+  kable_styling(latex_options = "HOLD_position")
 ```
 
 ```{r}
@@ -1142,7 +1143,8 @@ rect.hclust(ward_X, k = 2, border = c1)
 
 ```{r}
 cl_ward_X <- cutree(ward_X, 2)
-kable(cluster_classification(cl_ward_X))  %>% kable_styling(latex_options = "HOLD_position")
+kable(cluster_classification(cl_ward_X))  %>%
+  kable_styling(latex_options = "HOLD_position")
 ```
 
 The sizes of the clusters are almost identical, and it resembles mildly the groups of the target variable (`r round((table(cl_ward_X, y2)[1,1]+table(cl_ward_X, y2)[2,2]) / 757, 2)`% accuracy). 
@@ -1721,7 +1723,8 @@ pred <- predict(lda_train, X_test, type = "response")$posterior[,2] >
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm_lda_opt <- confusionMatrix(table(pred,Y_test), positive="Positive")
-cm_lda_opt$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+cm_lda_opt$table %>% kable() %>%
+  kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 ```{r, echo=FALSE}
@@ -1775,7 +1778,8 @@ And the confusion table is:
 
 ```{r}
 cm_QDA <- confusionMatrix(table(qda_Y_test,Y_test), positive="Positive")
-cm_QDA$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+cm_QDA$table %>% kable() %>%
+    kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 This is the same confusion table as for the default LDA! This means that accuracy, sensitivity, specificity... will be all the same.
 ```{r, echo=F}
@@ -1818,7 +1822,8 @@ pred <- predict(qda_train, X_test, type = "response")$posterior[,2] >
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm_qda_opt <- confusionMatrix(table(pred,Y_test), positive="Positive")
-cm_qda_opt$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+cm_qda_opt$table %>% kable() %>%
+    kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 We can see a better confusion matrix.
@@ -1938,7 +1943,8 @@ pred <- predict(nb_train, as.matrix(X_test), type = "prob")[,2] >
 pred <- pred * 1
 pred <- as.factor(c("Negative", "Positive")[(1*pred)+1])
 cm_nb_opt <- confusionMatrix(table(pred,Y_test), positive="Positive")
-cm_nb_opt$table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
+cm_nb_opt$table %>% kable() %>%
+    kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position")
 ```
 
 
@@ -1994,9 +2000,11 @@ for(i in 1:length(predictors_tables)){
 }
 results_table <- results_table[,-1]
 rownames(results_table) <- c("Accuracy", "BAC", "Sensitivity", "Specificity")
-colnames(results_table) <- c("KNN", "LR","LR_roc", "LDA","LDA_roc", "QDA","QDA_roc", "NB", "NB_roc")
+colnames(results_table) <- c("KNN", "LR","LR_roc",
+                            "LDA","LDA_roc", "QDA","QDA_roc", "NB", "NB_roc")
 
-results_table %>% kable() %>% kable_styling(latex_options = "striped") %>% kable_styling(latex_options = "HOLD_position", full_width = F)
+results_table %>% kable() %>% kable_styling(latex_options = "striped") %>%
+    kable_styling(latex_options = "HOLD_position", full_width = F)
 ```
 
 As we were faced with an unbalanced problem, it was not enough to look at metrics such as accuracy, and we had to consult others such as balanced accuracy, sensitivity or specificity. According to these metrics, the default LR did quite poorly, but after thresholding with the help of the ROC curve, we got really good results.
@@ -2007,7 +2015,37 @@ Finally, we believe that considering what levels of sensitivity and specificity 
 
 # Conclusions
 
+In this project, we have taken a dataset comprised of medical
+information about testings done in patients and whether they have or
+not diabetes.
+We took on the task of building a model which could
+successfully predict based on the clinical analysis the outcome
+of a diabetes test on a person.
+For this, we used a huge variety of statistical techniques.
 
+First, with the help pf multivariate analysis and
+dimensionality reducing methods, we grasped on the important
+features seggregating our two population groups.
+We also learned about the particularities of the values
+taken by the medical results of these patients.
+In the process, cleaning and correct treatment of the data
+was enforced, applying the necessary preprocessing steps,
+like imputing or discarding outliers, whenever it was necessary.
 
+Later, an unsupervised classification approach was taken.
+We resorted to many clustering methods to group all the predictors.
+The idea was to try and find if, by just looking at the features
+we may get an insight of the differences between the positive
+and negative population.
+In the process, we compared the different methos, arguing
+when some of them were not appropiate for our task.
 
+At last, a supervised classification was developed,
+taking a look at many of the avaible methods and with
+an special focus on the inbalance of this problem.
+We made use of advanced techniques like ROC curve
+which allowed us to improve the model and give a versatility
+depending of the targeted objective.
 
+All together, we completed the assigned task
+with success.
