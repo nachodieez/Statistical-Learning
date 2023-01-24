@@ -482,7 +482,7 @@ print("### Positive class ###")
 print("The mean vector is:")
 print(mcd_pos$center)
 m_cov_pos <- round(mcd_pos$cov, 2)
-kable(m_cov_pos)
+m_cov_pos
 ```
 
 ```{r, fig.size = c(8, 8)}
@@ -973,7 +973,7 @@ cluster_classification <- function(x, y = y2, first = 1){
 
 ### Number of clusters
 
-We'll firstly decide how many clusters we want to create. We'll use the silhoutte method and the gap statistic. The silhoutte method:
+We'll firstly decide how many clusters we want to create. We'll use the silhouette method and the gap statistic. The silhouette method:
 
 ```{r}
 set.seed(seed)
@@ -1464,7 +1464,7 @@ abline(h=0.5)
 
 We are not happy with the performance of the model so we are going to try to improve it.
 
-In order to try to improve it, we are going to first do stepwise model selection. 
+In order to do so, we are going to first do stepwise model selection. 
 The information criterion that we are going to use in order to evaluate the measure the performance of the model is the *Bayesian Information Criterion* (BIC),
 and it aims to balance the model complexity and fitness. We do the stepwise model selection:
 
@@ -1972,10 +1972,6 @@ plot(1:n_test,probs,col=colors_errors,pch=20,type="p",
 abline(h=as.numeric(rownames(ROC_lda$ci$specificity)))
 ```
 
-
-
-
-
 ## Conclusions of the section
 
 We have tried five different supervised classification methods:
@@ -2023,8 +2019,8 @@ successfully predict based on the clinical analysis the outcome
 of a diabetes test on a person.
 For this, we used a huge variety of statistical techniques.
 
-First, with the help pf multivariate analysis and
-dimensionality reducing methods, we grasped on the important
+First, with the help of multivariate analysis and
+dimensionality reduction methods, we grasped on the important
 features seggregating our two population groups.
 We also learned about the particularities of the values
 taken by the medical results of these patients.
